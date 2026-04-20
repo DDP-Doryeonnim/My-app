@@ -3,13 +3,14 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Galaga V4: EMP Master Edition</title>
+    <title>Galaga V5: Original Action Edition</title>
     <style>
         body { background: #000; color: #fff; margin: 0; overflow: hidden; font-family: 'Courier New', monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
         canvas { background: #00050a; border: 2px solid #333; box-shadow: 0 0 25px rgba(0,255,255,0.3); }
         #ui { position: absolute; top: 20px; width: 600px; display: flex; justify-content: space-between; font-size: 18px; pointer-events: none; }
         .info { color: #00ffcc; text-shadow: 0 0 5px cyan; }
-        #message { position: absolute; font-size: 45px; color: #00ffff; text-align: center; pointer-events: none; z-index: 10; font-weight: bold; }
+        #message-layer { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; text-align: center; z-index: 100; }
+        #stage-text { font-size: 60px; color: #ffff00; text-shadow: 0 0 20px #ffff00; margin: 0; opacity: 0; transition: opacity 0.3s; }
         #emp-alert { position: absolute; bottom: 80px; font-size: 24px; color: #ff00ff; text-shadow: 0 0 10px #ff00ff; display: none; }
     </style>
 </head>
@@ -20,27 +21,33 @@
         <div>LIVES: <span id="lives" class="info">10</span></div>
         <div>EMP (A): <span id="emp-count" class="info">10</span></div>
     </div>
-    <div id="message"></div>
+    
+    <div id="message-layer">
+        <h1 id="stage-text"></h1>
+    </div>
+
     <div id="emp-alert">SYSTEM OVERLOAD: EMP ACTIVE</div>
     <canvas id="gameCanvas" width="500" height="700"></canvas>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        const msg = document.getElementById('message');
+        const stageText = document.getElementById('stage-text');
         const empAlert = document.getElementById('emp-alert');
 
         let score = 0;
         let stage = 1;
         let lives = 10;
         let gameActive = true;
+        let gameState = 'STARTING'; // STARTING, PLAYING, GAMEOVER
+        let introTimer = 0;
         let keys = {};
 
         const PLAYER_SPEED = 6;
-        const BULLET_SPEED = 16; 
+        const BULLET_SPEED = 16;
         const MAX_STAGES = 10;
 
-        let player = { x: 250, y: 650, w: 30, h: 30 };
+        let player = { x: 250, y: 650 };
         let bullets = [];
         let enemyBullets = [];
         let enemies = [];
@@ -49,11 +56,11 @@
 
         let empActive = false;
         let empTimeRemaining = 0;
-        let empCharges = 10; // [변경] EMP 10개
+        let empCharges = 10;
 
         window.addEventListener('keydown', e => {
             keys[e.code] = true;
-            if(e.code === 'KeyA' && empCharges > 0 && !empActive && gameActive) {
+            if(e.code === 'KeyA' && empCharges > 0 && !empActive && gameState === 'PLAYING') {
                 activateEMP();
             }
         });
@@ -62,53 +69,74 @@
         function activateEMP() {
             empActive = true;
             empCharges--;
-            empTimeRemaining = 120; // 약 2초
-            
-            // [추가] EMP 발사 시 적의 미사일 즉시 제거
+            empTimeRemaining = 120;
             enemyBullets = [];
-            
             document.getElementById('emp-count').innerText = empCharges;
             empAlert.style.display = 'block';
             setTimeout(() => { empAlert.style.display = 'none'; }, 2000);
         }
 
         function initStage(s) {
+            gameState = 'STARTING';
+            introTimer = 120; // 2 seconds at 60fps
             enemies = [];
             enemyBullets = [];
+            bullets = [];
+            
+            stageText.innerText = `STAGE ${s}`;
+            stageText.style.opacity = 1;
+
             const rows = 3 + Math.floor(s / 3);
             const cols = 6 + Math.floor(s / 4);
+            let delayCounter = 0;
+
             for(let r = 0; r < rows; r++) {
                 for(let c = 0; c < cols; c++) {
+                    // 적 정보 생성
                     enemies.push({
-                        originX: 80 + c * 50, originY: 80 + r * 45,
-                        x: 80 + c * 50, y: 80 + r * 45,
-                        alive: true, state: 'FORMATION',
-                        diveAngle: 0, color: r === 0 ? '#ff0055' : (r === 1 ? '#00ccff' : '#00ff66'),
-                        hp: r === 0 ? 2 : 1, shakeX: 0, shakeY: 0
+                        targetX: 80 + c * 50,
+                        targetY: 80 + r * 45,
+                        // 시작 위치: 화면 밖 (상단 좌측 또는 우측)
+                        x: (c % 2 === 0) ? -50 : canvas.width + 50,
+                        y: -50,
+                        currentX: (c % 2 === 0) ? -50 : canvas.width + 50,
+                        currentY: -50,
+                        alive: true,
+                        state: 'ENTRY', // ENTRY, FORMATION, DIVING
+                        entryDelay: delayCounter * 5, // 순차 진입을 위한 딜레이
+                        color: r === 0 ? '#ff0055' : (r === 1 ? '#00ccff' : '#00ff66'),
+                        hp: r === 0 ? 2 : 1,
+                        shakeX: 0, shakeY: 0,
+                        diveAngle: 0
                     });
+                    delayCounter++;
                 }
             }
-            showMessage(`STAGE ${s}`, 2000);
-        }
-
-        function showMessage(text, duration) {
-            msg.innerText = text;
-            setTimeout(() => { if(msg.innerText === text) msg.innerText = ''; }, duration);
         }
 
         function update() {
-            if(!gameActive) return;
+            if(gameState === 'GAMEOVER') return;
 
+            // 스테이지 인트로 처리
+            if(gameState === 'STARTING') {
+                introTimer--;
+                if(introTimer <= 0) {
+                    gameState = 'PLAYING';
+                    stageText.style.opacity = 0;
+                }
+            }
+
+            // EMP 타이머
             if(empActive) {
                 empTimeRemaining--;
                 if(empTimeRemaining <= 0) empActive = false;
             }
 
-            // 아군 이동 및 발사 (EMP 상태와 무관하게 정상 작동)
+            // 아군 이동 및 발사 (인트로 중에도 이동 가능)
             if(keys['ArrowLeft'] && player.x > 15) player.x -= PLAYER_SPEED;
             if(keys['ArrowRight'] && player.x < canvas.width - 15) player.x += PLAYER_SPEED;
             
-            if(keys['Space'] && Date.now() - lastFired > 180) {
+            if(gameState === 'PLAYING' && keys['Space'] && Date.now() - lastFired > 180) {
                 bullets.push({ x: player.x - 10, y: player.y - 15 });
                 bullets.push({ x: player.x + 10, y: player.y - 15 });
                 lastFired = Date.now();
@@ -119,6 +147,7 @@
                 if(b.y < -20) bullets.splice(i, 1);
             });
 
+            // 적군 미사일 처리
             enemyBullets.forEach((eb, i) => {
                 eb.y += (3 + stage * 0.3) * 0.5; 
                 if(eb.y > canvas.height) enemyBullets.splice(i, 1);
@@ -128,57 +157,75 @@
                 }
             });
 
-            let allDead = true;
+            let allReadyAndDead = true;
             enemies.forEach(e => {
                 if(!e.alive) return;
-                allDead = false;
+                allReadyAndDead = false;
 
-                if(empActive) {
-                    // 적 정지 및 강한 진동
-                    e.shakeX = (Math.random() - 0.5) * 12;
-                    e.shakeY = (Math.random() - 0.5) * 12;
-                } else {
-                    e.shakeX = 0; e.shakeY = 0;
-                    if(e.state === 'FORMATION') {
-                        e.x = e.originX + Math.sin(Date.now() / 500) * 20;
-                        e.y = e.originY + Math.cos(Date.now() / 1000) * 5;
-                        if(Math.random() < 0.001 * stage) { e.state = 'DIVING'; e.diveAngle = 0; }
-                    } else if(e.state === 'DIVING') {
-                        e.y += (2.5 + stage * 0.4);
-                        e.x += Math.sin(e.diveAngle) * 5;
-                        e.diveAngle += 0.1;
-                        if(e.y > canvas.height) e.y = -50;
-                        if(e.y > e.originY && e.y < e.originY + 10 && Math.abs(e.x - e.originX) < 20) e.state = 'FORMATION';
-                        if(Math.abs(e.x - player.x) < 25 && Math.abs(e.y - player.y) < 25) die();
-                    }
+                if(gameState === 'PLAYING') {
+                    if(empActive) {
+                        e.shakeX = (Math.random() - 0.5) * 12;
+                        e.shakeY = (Math.random() - 0.5) * 12;
+                    } else {
+                        e.shakeX = 0; e.shakeY = 0;
+                        if(e.state === 'ENTRY') {
+                            if(e.entryDelay > 0) {
+                                e.entryDelay--;
+                            } else {
+                                // 대열로 이동 (곡선미를 위해 Lerp 사용)
+                                e.currentX += (e.targetX - e.currentX) * 0.05;
+                                e.currentY += (e.targetY - e.currentY) * 0.05;
+                                // 목표 근처 도달 시 대열 합류
+                                if(Math.abs(e.currentX - e.targetX) < 1 && Math.abs(e.currentY - e.targetY) < 1) {
+                                    e.state = 'FORMATION';
+                                }
+                            }
+                        } else if(e.state === 'FORMATION') {
+                            e.currentX = e.targetX + Math.sin(Date.now() / 500) * 20;
+                            e.currentY = e.targetY + Math.cos(Date.now() / 1000) * 5;
+                            if(Math.random() < 0.001 * stage) { e.state = 'DIVING'; e.diveAngle = 0; }
+                        } else if(e.state === 'DIVING') {
+                            e.currentY += (2.5 + stage * 0.4);
+                            e.currentX += Math.sin(e.diveAngle) * 5;
+                            e.diveAngle += 0.1;
+                            if(e.currentY > canvas.height) e.currentY = -50;
+                            if(e.currentY > e.targetY && e.currentY < e.targetY + 10 && Math.abs(e.currentX - e.targetX) < 20) e.state = 'FORMATION';
+                            if(Math.abs(e.currentX - player.x) < 25 && Math.abs(e.currentY - player.y) < 25) die();
+                        }
 
-                    if(Math.random() < 0.002 * stage && enemyBullets.length < 3 + stage) {
-                        enemyBullets.push({ x: e.x, y: e.y });
+                        // 적 미사일 발사 (진입 완료 후에만 발사)
+                        if(e.state !== 'ENTRY' && Math.random() < 0.002 * stage && enemyBullets.length < 3 + stage) {
+                            enemyBullets.push({ x: e.currentX, y: e.currentY });
+                        }
                     }
                 }
 
+                // 충돌 판정 (진입 중에도 맞음)
                 bullets.forEach((b, bi) => {
-                    if(Math.abs(b.x - (e.x + e.shakeX)) < 22 && Math.abs(b.y - (e.y + e.shakeY)) < 22) {
+                    if(Math.abs(b.x - (e.currentX + e.shakeX)) < 22 && Math.abs(b.y - (e.currentY + e.shakeY)) < 22) {
                         e.hp--;
                         bullets.splice(bi, 1);
                         if(e.hp <= 0) {
                             e.alive = false;
                             score += 100 * stage;
-                            spawnExplosion(e.x, e.y, e.color);
+                            spawnExplosion(e.currentX, e.currentY, e.color);
                         }
                     }
                 });
             });
 
-            if(allDead && gameActive) {
+            if(allReadyAndDead && gameState === 'PLAYING') {
                 if(stage < MAX_STAGES) { 
                     stage++; 
                     document.getElementById('stage').innerText = stage; 
                     initStage(stage); 
-                    empCharges = 10; // 스테이지 클리어 시 보충
+                    empCharges = 10;
                     document.getElementById('emp-count').innerText = empCharges; 
+                } else {
+                    gameState = 'GAMEOVER';
+                    stageText.innerText = "GALAXY SAVED!";
+                    stageText.style.opacity = 1;
                 }
-                else gameWin();
             }
             document.getElementById('score').innerText = score;
             document.getElementById('lives').innerText = lives;
@@ -187,8 +234,25 @@
         function die() {
             lives--;
             spawnExplosion(player.x, player.y, 'white');
-            if(lives <= 0) { gameActive = false; showMessage("SYSTEM FAILURE", 99999); }
-            else { player.x = 250; showMessage("REDEPLOYING", 1000); }
+            if(lives <= 0) { 
+                gameState = 'GAMEOVER'; 
+                stageText.innerText = "SYSTEM FAILURE";
+                stageText.style.opacity = 1;
+            } else { 
+                player.x = 250;
+                showMessageOverlay("READY", 1000); 
+            }
+        }
+
+        function showMessageOverlay(text, duration) {
+            const temp = document.createElement('div');
+            temp.style.position = 'absolute';
+            temp.style.top = '60%';
+            temp.style.color = 'cyan';
+            temp.style.fontSize = '30px';
+            temp.innerText = text;
+            document.body.appendChild(temp);
+            setTimeout(() => { temp.remove(); }, duration);
         }
 
         function spawnExplosion(x, y, color) {
@@ -196,8 +260,6 @@
                 particles.push({ x: x, y: y, dx: (Math.random()-0.5)*12, dy: (Math.random()-0.5)*12, life: 25, color: color });
             }
         }
-
-        function gameWin() { gameActive = false; showMessage("GALAXY SAVED!", 99999); }
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -210,27 +272,27 @@
             ctx.fillStyle = '#fff';
             for(let i=0; i<60; i++) ctx.fillRect((Math.random()*canvas.width), (Date.now()/15 + i*80) % canvas.height, 1, 1);
             
-            if(gameActive) {
-                ctx.fillStyle = 'white';
-                ctx.beginPath();
-                ctx.moveTo(player.x, player.y - 15);
-                ctx.lineTo(player.x + 15, player.y + 15);
-                ctx.lineTo(player.x - 15, player.y + 15);
-                ctx.fill();
-                ctx.fillStyle = '#00ffcc';
-                ctx.fillRect(player.x - 18, player.y + 5, 6, 12);
-                ctx.fillRect(player.x + 12, player.y + 5, 6, 12);
-            }
+            // Player
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.moveTo(player.x, player.y - 15);
+            ctx.lineTo(player.x + 15, player.y + 15);
+            ctx.lineTo(player.x - 15, player.y + 15);
+            ctx.fill();
+            ctx.fillStyle = '#00ffcc';
+            ctx.fillRect(player.x - 18, player.y + 5, 6, 12);
+            ctx.fillRect(player.x + 12, player.y + 5, 6, 12);
 
+            // Enemies
             enemies.forEach(e => {
                 if(!e.alive) return;
                 ctx.fillStyle = e.color;
                 ctx.beginPath();
-                ctx.ellipse(e.x + e.shakeX, e.y + e.shakeY, 13, 11, e.state === 'DIVING' ? Math.PI : 0, 0, Math.PI*2);
+                ctx.ellipse(e.currentX + e.shakeX, e.currentY + e.shakeY, 13, 11, (e.state === 'DIVING' || e.state === 'ENTRY') ? Math.PI : 0, 0, Math.PI*2);
                 ctx.fill();
                 ctx.fillStyle = 'white';
-                ctx.fillRect(e.x + e.shakeX - 6, e.y + e.shakeY - 8, 3, 3);
-                ctx.fillRect(e.x + e.shakeX + 3, e.y + e.shakeY - 8, 3, 3);
+                ctx.fillRect(e.currentX + e.shakeX - 6, e.currentY + e.shakeY - 8, 3, 3);
+                ctx.fillRect(e.currentX + e.shakeX + 3, e.currentY + e.shakeY - 8, 3, 3);
             });
 
             ctx.fillStyle = '#00ffff';
