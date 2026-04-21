@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Game Collection</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --card-bg: #ffffff;
+            --text-main: #212529;
+            --text-sub: #6c757d;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            color: var(--text-main);
+            margin: 0;
+            padding: 40px 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header-title {
+            text-align: center;
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--primary-color);
+            margin-bottom: 40px;
+        }
+        .game-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+        }
+        .game-card {
+            background-color: var(--card-bg);
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 30px 20px;
+            text-align: center;
+            text-decoration: none;
+            color: inherit;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            transition: all 0.2s ease-in-out;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .game-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            border-color: var(--primary-color);
+        }
+        .game-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+            text-transform: capitalize;
+        }
+        .game-filename {
+            font-size: 0.9rem;
+            color: var(--text-sub);
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-title">🎮 My Game Collection</div>
+        
+        <div class="game-grid" id="game-list">
+            <p>게임 목록을 불러오는 중입니다...</p>
+        </div>
+    </div>
+
+    <script>
+        // GitHub API를 통해 파일 목록을 가져오는 함수
+        async function loadGameList() {
+            // 본인의 깃허브 아이디와 저장소 이름
+            const owner = 'DDP-Doryeonnim';
+            const repo = 'My-app';
+            const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/`;
+
+            try {
+                const response = await fetch(apiUrl);
+                const data = await response.json();
+                
+                const gameListElement = document.getElementById('game-list');
+                gameListElement.innerHTML = ''; // '불러오는 중...' 텍스트 제거
+
+                // 데이터 중 .html로 끝나면서 index.html이 아닌 파일만 필터링
+                const htmlFiles = data.filter(file => 
+                    file.type === 'file' && 
+                    file.name.endsWith('.html') && 
+                    file.name !== 'index.html'
+                );
+
+                if (htmlFiles.length === 0) {
+                    gameListElement.innerHTML = '<p>등록된 게임이 없습니다.</p>';
+                    return;
+                }
+
+                // 필터링된 갯수만큼 카드를 자동으로 생성
+                htmlFiles.forEach(file => {
+                    // 파일명에서 .html을 제거하고 언더바(_)를 띄어쓰기로 변경하여 제목으로 사용
+                    const title = file.name.replace('.html', '').replace(/_/g, ' ');
+
+                    const card = document.createElement('a');
+                    card.href = file.name;
+                    card.className = 'game-card';
+                    card.innerHTML = `
+                        <div class="game-title">${title}</div>
+                        <div class="game-filename">${file.name}</div>
+                    `;
+                    
+                    gameListElement.appendChild(card);
+                });
+
+            } catch (error) {
+                console.error('목록 로드 실패:', error);
+                document.getElementById('game-list').innerHTML = '<p>목록을 불러오는 데 실패했습니다.</p>';
+            }
+        }
+
+        // 페이지가 열릴 때 함수 실행
+        loadGameList();
+    </script>
+</body>
+</html>
