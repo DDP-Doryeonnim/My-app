@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Fortress Turn-Base (Player vs AI)</title>
+    <style>
+        body { background: #1a1a1a; display: flex; flex-direction: column; align-items: center; color: white; font-family: sans-serif; overflow: hidden; margin: 0; }
+        canvas { background: linear-gradient(#135, #000); border: 4px solid #444; margin-top: 20px; }
+        .ui { width: 800px; padding: 15px; background: #333; display: flex; justify-content: space-between; border-radius: 0 0 10px 10px; }
+        .info { font-weight: bold; }
+        .player { color: #4af; }
+        .enemy { color: #f44; }
+        .guide { color: #aaa; font-size: 0.8em; }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" width="800" height="500"></canvas>
+    <div class="ui">
+        <div class="info">
+            <div id="turnStatus" class="player">내 턴 (PLAYER TURN)</div>
+            각도: <span id="angleText">45</span>° | 파워: <span id="powerText">0</span>
+        </div>
+        <div class="info">
+            나(HP): <span id="hpPlayer">100</span> | 적(HP): <span id="hpEnemy">100</span>
+        </div>
+        <div class="guide">
+            각도 조절: ←, → | 발사: Space (길게 누르면 파워 충전)
+        </div>
+    </div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// 게임 설정
+let turn = 'PLAYER'; // PLAYER or ENEMY
+let isCharging = false;
+let power = 0;
+let angle = 45;
+let bullets = [];
+let particles = [];
+let gameOver = false;
+
+const terrain = [];
+for(let x = 0; x <= canvas.width; x++) {
+    terrain[x] = 400 + Math.sin(x * 0.01) * 30 + Math.cos(x * 0.005) * 50;
+}
+
+const tanks = {
+    player: { x: 100, y: 0, color: '#4af', hp: 100 },
+    enemy: { x: 700, y: 0, color: '#f44', hp: 100 }
+};
+
+function updateTankY() {
+    tanks.player.y = terrain[tanks.player.x] - 10;
+    tanks.enemy.y = terrain[tanks.enemy.x] - 10;
+}
+
+// 조작 이벤트
+const keys = {};
+window.onkeydown = (e) => {
+    keys[e.code] = true;
+    if(e.code === 'Space' && turn === 'PLAYER' && !isCharging && bullets.length === 0 && !gameOver) {
+        isCharging = true;
+        power = 0;
+    }
+};
+window.onkeyup = (e) => {
+    keys[e.code] = false;
+    if(e.code === 'Space' && isCharging) {
+        fire(tanks.player, angle, power);
+        isCharging = false;
+    }
+};
+
+function fire(owner, ang, pwr) {
+    const rad = (owner === tanks.player ? -ang : -180 + ang) * Math.PI / 180;
+    bullets.push({
+        x: owner.x,
+        y: owner.y - 15,
+        vx: Math.cos(rad) * (pwr / 5),
+        vy: Math.sin(rad) * (pwr / 5),
+        owner: owner
+    });
+}
+
+// 적 AI 로직
+function aiTurn() {
+    if (gameOver) return;
+    setTimeout(() => {
+        const dist = tanks.enemy.x - tanks.player.x;
+        const randomAngle = 30 + Math.random() * 30;
+        // 거리 기반 대략적인 파워 계산
+        const neededPower = Math.sqrt(dist) * 3 + (Math.random() * 10 - 5);
+        fire(tanks.enemy, randomAngle, Math.min(neededPower, 100));
+    }, 1500);
+}
+
+function update() {
+    if (gameOver) return;
+
+    if (turn === 'PLAYER' && bullets.length === 0) {
+        if (keys['ArrowLeft']) angle = Math.min(90, angle + 1);
+        if (keys['ArrowRight']) angle = Math.max(0, angle - 1);
+        if (isCharging) power = Math.min(100, power + 1.5);
+    }
+
+    bullets.forEach((b, i) => {
+        b.x += b.vx;
+        b.y += b.vy;
+        b.vy += 0.2; // 중력
+
+        // 지형 충돌
+        if (b.x >= 0 && b.x < 800 && b.y >= terrain[Math.floor(b.x)]) {
+            explode(b.x, b.y);
+            bullets.splice(i, 1);
+            switchTurn();
+        } else if (b.x < 0 || b.x > 800 || b.y > 500) {
+            bullets.splice(i, 1);
+            switchTurn();
+        }
+    });
+
+    particles.forEach((p, i) => {
+        p.x += p.vx; p.y += p.vy; p.life--;
+        if (p.life <= 0) particles.splice(i, 1);
+    });
+
+    // UI 업데이트
+    document.getElementById('angleText').innerText = angle;
+    document.getElementById('powerText').innerText = Math.floor(power);
+    document.getElementById('hpPlayer').innerText = tanks.player.hp;
+    document.getElementById('hpEnemy').innerText = tanks.enemy.hp;
+}
+
+function explode(x, y) {
+    for(let i=0; i<20; i++) {
+        particles.push({
+            x: x, y: y,
+            vx: (Math.random()-0.5)*8, vy: (Math.random()-0.5)*8,
+            life: 30, color: '#f80'
+        });
+    }
+    // 데미지 판정
+    [tanks.player, tanks.enemy].forEach(t => {
+        const d = Math.hypot(t.x - x, t.y - y);
+        if (d < 40) {
+            t.hp -= Math.floor(40 - d);
+            if (t.hp <= 0) { t.hp = 0; gameOver = true; }
+        }
+    });
+}
+
+function switchTurn() {
+    if (gameOver) return;
+    turn = (turn === 'PLAYER') ? 'ENEMY' : 'PLAYER';
+    const ts = document.getElementById('turnStatus');
+    ts.innerText = turn === 'PLAYER' ? "내 턴 (PLAYER TURN)" : "적 턴 (ENEMY TURN)";
+    ts.className = turn === 'PLAYER' ? "player" : "enemy";
+    if (turn === 'ENEMY') aiTurn();
+}
+
+function draw() {
+    ctx.clearRect(0, 0, 800, 500);
+
+    // 지형
+    ctx.fillStyle = '#472';
+    ctx.beginPath();
+    ctx.moveTo(0, 500);
+    for(let x=0; x<=800; x++) ctx.lineTo(x, terrain[x]);
+    ctx.lineTo(800, 500);
+    ctx.fill();
+
+    // 탱크
+    [tanks.player, tanks.enemy].forEach(t => {
+        ctx.fillStyle = t.color;
+        ctx.fillRect(t.x - 15, t.y - 15, 30, 15);
+        // 포신
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(t.x, t.y - 10);
+        const curAngle = (t === tanks.player) ? angle : 180 - angle;
+        const rad = -curAngle * Math.PI / 180;
+        ctx.lineTo(t.x + Math.cos(rad)*25, t.y - 10 + Math.sin(rad)*25);
+        ctx.stroke();
+    });
+
+    // 포탄 및 파티클
+    ctx.fillStyle = 'white';
+    bullets.forEach(b => { ctx.beginPath(); ctx.arc(b.x, b.y, 4, 0, Math.PI*2); ctx.fill(); });
+    particles.forEach(p => { ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, 3, 3); });
+
+    // 파워바
+    if (isCharging) {
+        ctx.fillStyle = 'red';
+        ctx.fillRect(tanks.player.x - 20, tanks.player.y - 40, power * 0.4, 5);
+    }
+
+    if (gameOver) {
+        ctx.fillStyle = 'rgba(0,0,0,0.7)';
+        ctx.fillRect(0, 0, 800, 500);
+        ctx.fillStyle = 'white';
+        ctx.font = '40px Arial';
+        ctx.fillText(tanks.player.hp > 0 ? "YOU WIN!" : "GAME OVER", 300, 250);
+    }
+}
+
+function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+}
+
+updateTankY();
+loop();
+</script>
+</body>
+</html>
