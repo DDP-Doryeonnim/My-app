@@ -24,9 +24,10 @@
             justify-content: center;
             align-items: center;
             height: 100vh;
-            overflow: hidden; /* 모바일 스크롤 방지 */
-            touch-action: none; /* 모바일 제스처 방지 */
+            overflow: hidden;
+            touch-action: none;
             user-select: none;
+            -webkit-user-select: none; /* 모바일 텍스트 선택 방지 */
         }
 
         #game-wrapper {
@@ -86,7 +87,6 @@
             align-items: center;
         }
 
-        /* 캔버스 자동 비율 조절 (핵심) */
         #board {
             display: block;
             width: 100%;
@@ -168,11 +168,14 @@
             transition: all 0.2s;
             text-transform: uppercase;
             touch-action: manipulation;
+            outline: none;
+            -webkit-tap-highlight-color: transparent; /* 터치 시 하이라이트 제거 */
         }
 
-        button:active {
+        button:active, button.active {
             transform: scale(0.95);
             border-color: var(--accent-color);
+            background: #2a2a35;
         }
 
         button:disabled {
@@ -190,7 +193,7 @@
         }
         
         .touch-controls {
-            display: none; /* PC에서는 숨김 */
+            display: none;
         }
 
         /* 반응형 모바일 화면 설계 */
@@ -229,7 +232,7 @@
             .info-title { font-size: 0.6rem; }
 
             .canvas-container {
-                flex: 1; /* 남은 공간을 캔버스가 차지 */
+                flex: 1;
                 min-height: 0;
             }
             
@@ -239,9 +242,8 @@
                 max-height: 50vh;
             }
 
-            .controls-hint { display: none; } /* 모바일에서 PC 키보드 힌트 숨김 */
+            .controls-hint { display: none; }
             
-            /* 모바일 하단 컨트롤러 영역 정렬 */
             .bottom-panel {
                 display: flex;
                 flex-direction: column;
@@ -272,29 +274,40 @@
                 padding: 0;
             }
 
-            /* 터치 컨트롤 버튼 표시 */
+            /* 터치 컨트롤 버튼 크게 개선 */
             .touch-controls {
                 display: grid;
                 grid-template-columns: repeat(4, 1fr);
                 grid-template-rows: repeat(2, 1fr);
                 gap: 8px;
                 width: 100%;
+                height: 120px; /* 터치 영역 높이 확보 */
             }
 
             .t-btn {
                 background: #2a2a35;
                 font-size: 1.5rem;
-                padding: 15px 0;
                 display: flex;
                 justify-content: center;
                 align-items: center;
+                border-radius: 8px;
+                border: 1px solid var(--border-color);
+                color: #fff;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            }
+            
+            .t-btn:active, .t-btn.active {
+                background: #3a3a4a;
+                transform: translateY(2px);
+                box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+                border-color: var(--accent-color);
             }
 
             #btn-t-up { grid-column: 2 / 3; grid-row: 1 / 2; }
             #btn-t-left { grid-column: 1 / 2; grid-row: 2 / 3; }
             #btn-t-down { grid-column: 2 / 3; grid-row: 2 / 3; }
             #btn-t-right { grid-column: 3 / 4; grid-row: 2 / 3; }
-            #btn-t-drop { grid-column: 4 / 5; grid-row: 1 / 3; background: #3a1a24; border-color: #ff0055;}
+            #btn-t-drop { grid-column: 4 / 5; grid-row: 1 / 3; background: #5a1a24; border-color: #ff0055; font-size: 2rem;}
         }
     </style>
 </head>
@@ -572,34 +585,64 @@
     btnPause.addEventListener('click', togglePause);
     btnStop.addEventListener('click', stopGame);
 
-    // 터치 이벤트 (Mobile)
-    function setupTouchControl(id, action) {
+    // 강력한 모바일 터치 이벤트 핸들링 (Pointer Events 사용)
+    function setupTouchButton(id, actionOnDown, continuous = false) {
         const btn = document.getElementById(id);
-        if(!btn) return;
-        
-        let interval;
+        if (!btn) return;
+
+        let intervalId;
+        let isPressed = false;
+
         const startAction = (e) => {
-            e.preventDefault(); // 더블탭 줌, 스크롤 방지
-            if (!isPlaying || isPaused) return;
-            action(); draw();
+            if(e.cancelable) e.preventDefault();
+            if (!isPlaying || isPaused || isPressed) return;
             
-            // 좌우, 아래 이동은 누르고 있으면 연속 동작
-            if(id === 'btn-t-left' || id === 'btn-t-right' || id === 'btn-t-down') {
-                interval = setInterval(() => { action(); draw(); }, 100);
+            isPressed = true;
+            btn.classList.add('active'); // 시각적 피드백
+            
+            actionOnDown();
+            draw();
+
+            if (continuous) {
+                // 첫 입력 후 약간의 딜레이 후 연속 입력 시작
+                setTimeout(() => {
+                    if(isPressed) {
+                        intervalId = setInterval(() => {
+                            actionOnDown();
+                            draw();
+                        }, 80); // 연속 이동 속도
+                    }
+                }, 200);
             }
         };
-        const stopAction = (e) => { e.preventDefault(); clearInterval(interval); };
 
+        const stopAction = (e) => {
+            if(e.cancelable) e.preventDefault();
+            isPressed = false;
+            btn.classList.remove('active');
+            clearInterval(intervalId);
+        };
+
+        // Pointer Events (모던 브라우저 및 터치 기기 호환성 향상)
+        btn.addEventListener('pointerdown', startAction);
+        btn.addEventListener('pointerup', stopAction);
+        btn.addEventListener('pointerout', stopAction);
+        btn.addEventListener('pointercancel', stopAction);
+        
+        // 기존 터치 이벤트(보조)
         btn.addEventListener('touchstart', startAction, {passive: false});
         btn.addEventListener('touchend', stopAction, {passive: false});
         btn.addEventListener('touchcancel', stopAction, {passive: false});
     }
 
-    setupTouchControl('btn-t-left', () => playerMove(-1));
-    setupTouchControl('btn-t-right', () => playerMove(1));
-    setupTouchControl('btn-t-down', () => playerDrop());
-    setupTouchControl('btn-t-up', () => playerRotate());
-    setupTouchControl('btn-t-drop', () => hardDrop());
+    // 버튼 연결 (좌/우/아래는 꾹 누르면 연속 동작)
+    setupTouchButton('btn-t-left', () => playerMove(-1), true);
+    setupTouchButton('btn-t-right', () => playerMove(1), true);
+    setupTouchButton('btn-t-down', () => playerDrop(), true);
+    
+    // 회전/하드드롭은 누를 때마다 한 번씩만 동작
+    setupTouchButton('btn-t-up', () => playerRotate(), false);
+    setupTouchButton('btn-t-drop', () => hardDrop(), false);
 
     draw();
     drawNextPiece();
