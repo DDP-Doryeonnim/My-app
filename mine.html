@@ -187,7 +187,7 @@
     
     <div class="mobile-tip">
         PC: 왼쪽 클릭(열기), 오른쪽 클릭(깃발)<br>
-        스마트폰: 터치(열기), 길게 누르기(깃발)
+        스마트폰: 터치(열기), 더블 터치(깃발)
     </div>
 
     <script>
@@ -263,33 +263,41 @@
                     cellData.element.classList.add('cell');
                     
                     // PC 이벤트
-                    cellData.element.addEventListener('click', (e) => handleLeftClick(r, c));
+                    cellData.element.addEventListener('click', (e) => {
+                        // 터치 이벤트로 인한 중복 실행을 방지하기 위해 마우스 클릭만 처리
+                        if (e.pointerType === 'mouse' || e.pointerType === undefined) {
+                            handleLeftClick(r, c);
+                        }
+                    });
+                    
                     cellData.element.addEventListener('contextmenu', (e) => {
                         e.preventDefault();
                         handleRightClick(r, c);
                     });
 
-                    // 모바일 길게 누르기 이벤트 (터치)
-                    let touchTimer;
-                    cellData.element.addEventListener('touchstart', (e) => {
-                        if (isGameOver) return;
-                        touchTimer = setTimeout(() => {
-                            touchTimer = null;
-                            handleRightClick(r, c);
-                            // 진동 피드백 (지원 기기)
-                            if (navigator.vibrate) navigator.vibrate(50); 
-                        }, 400); // 400ms 길게 누르면 깃발
-                    }, {passive: true});
+                    // 모바일 더블 터치(더블 클릭) 이벤트 처리
+                    let lastTapTime = 0;
+                    let tapTimer = null;
 
                     cellData.element.addEventListener('touchend', (e) => {
-                        if (touchTimer) {
-                            clearTimeout(touchTimer); // 길게 누르기 전에 손을 떼면 클릭으로 간주
-                            handleLeftClick(r, c);
-                            e.preventDefault(); // 기본 클릭 이벤트 중복 방지
+                        if (isGameOver) return;
+                        e.preventDefault(); // 기본 클릭 이벤트 및 줌인 방지
+
+                        const currentTime = new Date().getTime();
+                        const tapInterval = currentTime - lastTapTime;
+
+                        if (tapInterval > 0 && tapInterval < 300) {
+                            // 300ms 이내 더블 터치 발생 시 (깃발)
+                            clearTimeout(tapTimer); // 예약된 싱글 터치 취소
+                            handleRightClick(r, c);
+                            if (navigator.vibrate) navigator.vibrate(50); // 진동 피드백
+                        } else {
+                            // 싱글 터치 판별 대기 (셀 열기)
+                            tapTimer = setTimeout(() => {
+                                handleLeftClick(r, c);
+                            }, 300);
                         }
-                    });
-                    cellData.element.addEventListener('touchmove', () => {
-                        if (touchTimer) clearTimeout(touchTimer); // 스크롤 시 터치 취소
+                        lastTapTime = currentTime;
                     });
 
                     boardEl.appendChild(cellData.element);
