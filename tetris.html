@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Premium Tetris (Original UI Restored)</title>
+    <title>Premium Tetris (Mobile Control Optimized)</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
 
@@ -30,7 +30,7 @@
             -webkit-user-select: none;
         }
 
-        /* [PC 레이아웃] 스크린샷 1번과 동일한 3단 구조 */
+        /* [PC 레이아웃] 원본 디자인 유지 */
         #game-wrapper {
             display: flex;
             flex-direction: row;
@@ -66,7 +66,7 @@
         .hint-box { font-size: 0.7rem; color: #666; text-align: left; line-height: 1.6; margin-top: auto; }
         .hint-box span { color: #888; font-weight: bold; }
 
-        /* 중앙 게임판 */
+        /* 중앙 게임 보드 */
         .canvas-container {
             position: relative;
             background: #000;
@@ -157,26 +157,37 @@
 
             .bottom-panel { display: flex; flex-direction: column; gap: 10px; }
             .top-controls { display: flex; flex-direction: row; align-items: center; gap: 10px; }
-            .controls { flex-direction: row; flex: 1; }
+            .controls { flex-direction: row; flex: 1; gap: 5px; }
             .controls button { flex: 1; padding: 10px 5px; font-size: 0.75rem; }
             #next-piece-container { width: 60px; height: 60px; margin: 0; display: flex; align-items: center; justify-content: center; }
             #next-piece { width: 50px; height: 50px; }
 
+            /* [수정] 터치 버튼 배치: 좌, 아래, 우, 빨리떨어지기, 회전 */
             .touch-controls {
-                display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(2, 1fr);
-                gap: 8px; width: 100%; padding-bottom: 10px;
+                display: flex;
+                flex-direction: row;
+                gap: 8px;
+                width: 100%;
+                padding-bottom: 10px;
+                align-items: stretch;
             }
             .t-btn {
-                background: #2a2a35; font-size: 1.4rem; height: 55px;
-                display: flex; justify-content: center; align-items: center;
-                border-radius: 8px; border: 1px solid var(--border-color); color: #fff;
+                background: #2a2a35;
+                font-size: 1.4rem;
+                height: 65px;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                border-radius: 8px;
+                border: 1px solid var(--border-color);
+                color: #fff;
+                flex: 1; /* 기본적으로 동일 비율 */
             }
-            .t-btn:active { background: var(--accent-color); color: #000; }
-            #btn-t-up { grid-column: 2 / 3; grid-row: 1 / 2; }
-            #btn-t-left { grid-column: 1 / 2; grid-row: 2 / 3; }
-            #btn-t-down { grid-column: 2 / 3; grid-row: 2 / 3; }
-            #btn-t-right { grid-column: 3 / 4; grid-row: 2 / 3; }
-            #btn-t-drop { grid-column: 4 / 5; grid-row: 1 / 3; background: #4a1a24; height: auto; font-size: 2rem; border-color: #ff0055; }
+            .t-btn:active { background: var(--accent-color); color: #000; box-shadow: 0 0 15px var(--accent-color); }
+            
+            /* [수정] 특정 버튼 크기 조정 */
+            #btn-t-drop { flex: 1.3; background: #4a1a24; border-color: #ff0055; } /* 빨리 떨어지기 약간 크게 */
+            #btn-t-up { flex: 1.8; background: #2a3a4a; border-color: var(--accent-color); font-size: 1.8rem; } /* 회전 버튼 가장 크게 */
         }
     </style>
 </head>
@@ -219,23 +230,23 @@
         </div>
 
         <div class="touch-controls">
-            <button class="t-btn" id="btn-t-up">↻</button>
             <button class="t-btn" id="btn-t-left">←</button>
             <button class="t-btn" id="btn-t-down">↓</button>
             <button class="t-btn" id="btn-t-right">→</button>
             <button class="t-btn" id="btn-t-drop">⏬</button>
+            <button class="t-btn" id="btn-t-up">↻</button>
         </div>
     </div>
 </div>
 
 <div id="photo-overlay">
     <img id="clear-photo" src="" alt="Cleared Photo">
-    <div style="color: var(--accent-color); margin-top:20px; font-weight:bold;">Tap to Continue</div>
+    <div style="color: var(--accent-color); margin-top:20px; font-weight:bold; font-size:1.1rem;">Tap to Continue</div>
+    <div id="debug-text" style="color:#ff5555; font-size:0.7rem; margin-top:10px;"></div>
 </div>
 
 <script>
     const SECRET_IMAGES = Array.from({length: 44}, (_, i) => `./YoomiImage/Youmi${String(i + 1).padStart(3, '0')}.jpg`);
-    
     const COLS = 10, ROWS = 20, BLOCK_SIZE = 30;
     const canvas = document.getElementById('board'), ctx = canvas.getContext('2d');
     const nextCanvas = document.getElementById('next-piece'), nextCtx = nextCanvas.getContext('2d');
@@ -261,7 +272,7 @@
 
     function drawBlock(context, x, y, colorStr, size, isGhost = false) {
         const px = Math.floor(x * size), py = Math.floor(y * size), s = Math.ceil(size);
-        context.fillStyle = isGhost ? hexToRgba(colorStr, 0.15) : colorStr;
+        context.fillStyle = isGhost ? hexToRgba(colorStr, 0.18) : colorStr;
         if (!isGhost) { context.shadowBlur = 5; context.shadowColor = colorStr; }
         context.fillRect(px + 1, py + 1, s - 2, s - 2);
         context.shadowBlur = 0;
@@ -352,6 +363,11 @@
         }, 1500);
     });
 
+    clearPhoto.onerror = function() {
+        if (this.src.includes('.jpg')) this.src = this.src.replace('.jpg', '.JPG');
+        else document.getElementById('debug-text').innerText = "Image Path Error: " + decodeURI(this.src);
+    };
+
     function updateUI() { scoreElem.innerText = score; levelElem.innerText = level; linesElem.innerText = lines; }
     function spawnPiece() { nextPieceType = nextPieceType || randomPiece(); piece = createPieceObj(nextPieceType); nextPieceType = randomPiece(); drawNextPiece(); dropInterval = Math.max(50, 1000 - ((level - 1) * 100)); }
 
@@ -398,8 +414,12 @@
         const end = () => clearInterval(timer);
         b.addEventListener('pointerdown', start); b.addEventListener('pointerup', end); b.addEventListener('pointerleave', end);
     }
-    setupBtn('btn-t-left', () => playerMove(-1), true); setupBtn('btn-t-right', () => playerMove(1), true);
-    setupBtn('btn-t-down', () => playerDrop(), true); setupBtn('btn-t-up', () => playerRotate()); setupBtn('btn-t-drop', () => hardDrop());
+    // [수정] 좌, 아래, 우, 빨리떨어지기, 회전 순서에 맞춰 핸들러 연결
+    setupBtn('btn-t-left', () => playerMove(-1), true); 
+    setupBtn('btn-t-down', () => playerDrop(), true);
+    setupBtn('btn-t-right', () => playerMove(1), true);
+    setupBtn('btn-t-drop', () => hardDrop());
+    setupBtn('btn-t-up', () => playerRotate());
 
     draw(); drawNextPiece();
 </script>
