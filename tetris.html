@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Premium Tetris (Perfect Ghost Fix)</title>
+    <title>Premium Tetris (Mobile Perfect Fix)</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
 
@@ -76,7 +76,7 @@
 
         .canvas-container {
             position: relative;
-            background: #111; /* 게임판 배경을 약간 밝게 하여 좌우 경계 확보 */
+            background: #111; /* 보드 외부 배경색을 살짝 밝게 하여 경계 확보 */
             border: 2px solid var(--border-color);
             border-radius: 5px;
             display: flex;
@@ -102,7 +102,7 @@
             aspect-ratio: 1 / 1;
         }
 
-        /* 오버레이 스타일 */
+        /* 게임 상태 오버레이 */
         #overlay, #level-banner {
             position: absolute;
             top: 0; left: 0;
@@ -124,7 +124,7 @@
             100% { transform: scale(1.5); opacity: 0; }
         }
 
-        /* 사진 팝업 */
+        /* 레벨 클리어 사진 팝업 */
         #photo-overlay {
             position: fixed;
             top: 0; left: 0;
@@ -146,7 +146,7 @@
 
         #debug-text { color: #ff5555; margin-top: 15px; font-size: 0.8rem; text-align: center; padding: 0 20px; }
 
-        /* 터치 컨트롤 */
+        /* 터치 조작부 (모바일 전용) */
         .touch-controls { display: none; }
 
         @media (max-width: 768px), (max-height: 800px) {
@@ -252,24 +252,34 @@
     let isPlaying = false, isPaused = false, isLevelTransition = false;
     let dropCounter = 0, dropInterval = 1000, lastTime = 0, reqId = null;
 
+    // HEX 색상을 RGBA로 변환하는 헬퍼 함수 (모바일 globalAlpha 버그 방지)
+    function hexToRgba(hex, alpha) {
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+
     function createBoard() { return Array.from({length: ROWS}, () => Array(COLS).fill(0)); }
     function randomPiece() { return Math.floor(Math.random() * 7) + 1; }
     function createPieceObj(type) { return { matrix: SHAPES[type], x: Math.floor(COLS / 2) - Math.floor(SHAPES[type][0].length / 2), y: 0, type: type }; }
 
-    // [수정] 블록 그리기 함수: 고스트 여부를 인자로 받아 효과를 제어함
+    // [디버깅] 고스트 블록 4개 중 일부만 진하게 나오는 현상 해결을 위해 개별 RGBA 적용
     function drawBlock(context, x, y, colorStr, size, isGhost = false) {
         const px = Math.floor(x * size), py = Math.floor(y * size), s = Math.ceil(size);
 
-        if (!isGhost) {
+        if (isGhost) {
+            context.shadowBlur = 0;
+            context.shadowColor = 'transparent';
+            context.fillStyle = hexToRgba(colorStr, 0.15); // globalAlpha 대신 개별 RGBA 적용
+        } else {
             context.shadowBlur = 5;
             context.shadowColor = colorStr;
-        } else {
-            context.shadowBlur = 0; // 고스트는 그림자 효과 제거
+            context.fillStyle = colorStr;
         }
 
-        context.fillStyle = colorStr;
         context.fillRect(px + 1, py + 1, s - 2, s - 2);
-        context.shadowBlur = 0;
+        context.shadowBlur = 0; // 상태 초기화
 
         if (!isGhost) {
             context.fillStyle = 'rgba(255,255,255,0.3)';
@@ -280,12 +290,12 @@
     }
 
     function draw() {
-        const currentBlockSize = canvas.width / COLS; // [모바일 공중부양 방지] 실시간 너비 기준 계산
+        const currentBlockSize = canvas.width / COLS; // [모바일 공중부양 방지] 실시간 너비 기준 갱신
 
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // 격자선 (좌우 경계 파악 도움)
+        // 격자선 (모바일 시인성 확보)
         ctx.strokeStyle = '#1a1a1a';
         ctx.lineWidth = 1;
         for(let i=0; i<=COLS; i++) { ctx.beginPath(); ctx.moveTo(i*currentBlockSize, 0); ctx.lineTo(i*currentBlockSize, canvas.height); ctx.stroke(); }
@@ -294,18 +304,15 @@
         board.forEach((row, y) => row.forEach((v, x) => { if (v > 0) drawBlock(ctx, x, y, COLORS[v], currentBlockSize); }));
 
         if (piece && !isPaused && !isLevelTransition) {
-            // [수정] 고스트 블록 로직 개선 (연하게 확실히 구분)
             let ghostY = piece.y;
             while (!collide(piece.matrix, piece.x, ghostY + 1)) ghostY++;
             
-            ctx.save();
-            ctx.globalAlpha = 0.15; // 확실히 연하게 설정
+            // [디버깅 완료] 고스트 블록 렌더링 - 개별 셀 단위로 투명도 제어
             piece.matrix.forEach((row, y) => row.forEach((v, x) => {
                 if (v !== 0) drawBlock(ctx, piece.x + x, ghostY + y, COLORS[piece.type], currentBlockSize, true);
             }));
-            ctx.restore();
 
-            // 실제 블록
+            // 실제 블록 렌더링
             piece.matrix.forEach((row, y) => row.forEach((v, x) => {
                 if (v !== 0) drawBlock(ctx, piece.x + x, piece.y + y, COLORS[piece.type], currentBlockSize, false);
             }));
