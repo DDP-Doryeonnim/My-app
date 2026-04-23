@@ -27,7 +27,7 @@
             overflow: hidden;
             touch-action: none;
             user-select: none;
-            -webkit-user-select: none; /* 모바일 텍스트 선택 방지 */
+            -webkit-user-select: none;
         }
 
         #game-wrapper {
@@ -85,6 +85,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            overflow: hidden;
         }
 
         #board {
@@ -150,6 +151,43 @@
             100% { transform: scale(1.5); opacity: 0; }
         }
 
+        #photo-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 1000;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        #photo-overlay img {
+            max-width: 90vw;
+            max-height: 80vh;
+            object-fit: contain;
+            border: 2px solid var(--accent-color);
+            border-radius: 10px;
+            box-shadow: 0 0 30px rgba(0, 229, 255, 0.5);
+        }
+
+        #photo-overlay .touch-hint {
+            color: var(--accent-color);
+            font-size: 1.2rem;
+            margin-top: 20px;
+            font-weight: bold;
+            animation: blink 1.5s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.2; }
+        }
+
         .controls {
             display: flex;
             flex-direction: column;
@@ -169,7 +207,7 @@
             text-transform: uppercase;
             touch-action: manipulation;
             outline: none;
-            -webkit-tap-highlight-color: transparent; /* 터치 시 하이라이트 제거 */
+            -webkit-tap-highlight-color: transparent;
         }
 
         button:active, button.active {
@@ -196,7 +234,6 @@
             display: none;
         }
 
-        /* 반응형 모바일 화면 설계 */
         @media (max-width: 768px), (max-height: 700px) {
             #game-wrapper {
                 flex-direction: column;
@@ -274,14 +311,13 @@
                 padding: 0;
             }
 
-            /* 터치 컨트롤 버튼 크게 개선 */
             .touch-controls {
                 display: grid;
                 grid-template-columns: repeat(4, 1fr);
                 grid-template-rows: repeat(2, 1fr);
                 gap: 8px;
                 width: 100%;
-                height: 120px; /* 터치 영역 높이 확보 */
+                height: 120px; 
             }
 
             .t-btn {
@@ -372,7 +408,27 @@
     </div>
 </div>
 
+<div id="photo-overlay">
+    <img id="clear-photo" src="" alt="Level Cleared Photo">
+    <div class="touch-hint">Tap to Continue</div>
+</div>
+
 <script>
+    // 명시적인 상대 경로(./)를 사용하여 호환성 문제 해결
+    const SECRET_IMAGES = [
+        './YoomiImage/Youmi001.jpg', './YoomiImage/Youmi002.jpg', './YoomiImage/Youmi003.jpg', './YoomiImage/Youmi004.jpg',
+        './YoomiImage/Youmi005.jpg', './YoomiImage/Youmi006.jpg', './YoomiImage/Youmi007.jpg', './YoomiImage/Youmi008.jpg',
+        './YoomiImage/Youmi009.jpg', './YoomiImage/Youmi010.jpg', './YoomiImage/Youmi011.jpg', './YoomiImage/Youmi012.jpg',
+        './YoomiImage/Youmi013.jpg', './YoomiImage/Youmi014.jpg', './YoomiImage/Youmi015.jpg', './YoomiImage/Youmi016.jpg',
+        './YoomiImage/Youmi017.jpg', './YoomiImage/Youmi018.jpg', './YoomiImage/Youmi019.jpg', './YoomiImage/Youmi020.jpg',
+        './YoomiImage/Youmi021.jpg', './YoomiImage/Youmi022.jpg', './YoomiImage/Youmi023.jpg', './YoomiImage/Youmi024.jpg',
+        './YoomiImage/Youmi025.jpg', './YoomiImage/Youmi026.jpg', './YoomiImage/Youmi027.jpg', './YoomiImage/Youmi028.jpg',
+        './YoomiImage/Youmi029.jpg', './YoomiImage/Youmi030.jpg', './YoomiImage/Youmi031.jpg', './YoomiImage/Youmi032.jpg',
+        './YoomiImage/Youmi033.jpg', './YoomiImage/Youmi034.jpg', './YoomiImage/Youmi035.jpg', './YoomiImage/Youmi036.jpg',
+        './YoomiImage/Youmi037.jpg', './YoomiImage/Youmi038.jpg', './YoomiImage/Youmi039.jpg', './YoomiImage/Youmi040.jpg',
+        './YoomiImage/Youmi041.jpg', './YoomiImage/Youmi042.jpg', './YoomiImage/Youmi043.jpg', './YoomiImage/Youmi044.jpg'
+    ];
+
     const COLS = 10;
     const ROWS = 20;
     const BLOCK_SIZE = 30;
@@ -392,6 +448,9 @@
     const overlayDesc = document.getElementById('overlay-desc');
     const levelBanner = document.getElementById('level-banner');
     const levelText = document.getElementById('level-text');
+
+    const photoOverlay = document.getElementById('photo-overlay');
+    const clearPhoto = document.getElementById('clear-photo');
 
     const btnStart = document.getElementById('btn-start');
     const btnPause = document.getElementById('btn-pause');
@@ -415,8 +474,11 @@
     let score = 0;
     let level = 1;
     let lines = 0;
+    
     let isPlaying = false;
     let isPaused = false;
+    let isLevelTransition = false; 
+
     let dropCounter = 0;
     let dropInterval = 1000;
     let lastTime = 0;
@@ -443,13 +505,14 @@
     function draw() {
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
+
         ctx.strokeStyle = '#111'; ctx.lineWidth = 1;
         for(let i=0; i<COLS; i++) { ctx.beginPath(); ctx.moveTo(i*BLOCK_SIZE, 0); ctx.lineTo(i*BLOCK_SIZE, canvas.height); ctx.stroke(); }
         for(let j=0; j<ROWS; j++) { ctx.beginPath(); ctx.moveTo(0, j*BLOCK_SIZE); ctx.lineTo(canvas.width, j*BLOCK_SIZE); ctx.stroke(); }
 
         board.forEach((row, y) => row.forEach((value, x) => { if (value > 0) drawBlock(ctx, x, y, COLORS[value], BLOCK_SIZE); }));
 
-        if (piece && !isPaused) {
+        if (piece && !isPaused && !isLevelTransition) {
             let ghostY = piece.y;
             while (!collide(piece.matrix, piece.x, ghostY + 1)) ghostY++;
             ctx.globalAlpha = 0.2;
@@ -483,11 +546,13 @@
     }
 
     function merge() { piece.matrix.forEach((row, y) => row.forEach((value, x) => { if (value !== 0) board[y + piece.y][x + piece.x] = value; })); }
+    
     function rotate(matrix) {
         const N = matrix.length; const result = matrix.map(() => []);
         for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) result[i][j] = matrix[N - j - 1][i];
         return result;
     }
+    
     function playerRotate() {
         const pos = piece.x; let offset = 1; const rotated = rotate(piece.matrix); const originalMatrix = piece.matrix; piece.matrix = rotated;
         while (collide(piece.matrix, piece.x, piece.y)) {
@@ -495,15 +560,21 @@
             if (offset > rotated[0].length) { piece.matrix = originalMatrix; piece.x = pos; return; }
         }
     }
+    
     function playerMove(dir) { if (!collide(piece.matrix, piece.x + dir, piece.y)) piece.x += dir; }
+    
     function playerDrop() {
         if (!collide(piece.matrix, piece.x, piece.y + 1)) { piece.y++; } 
         else {
-            merge(); clearLines(); spawnPiece();
-            if (collide(piece.matrix, piece.x, piece.y)) gameOver();
+            merge(); clearLines(); 
+            if (!isLevelTransition) {
+                spawnPiece();
+                if (collide(piece.matrix, piece.x, piece.y)) gameOver();
+            }
         }
         dropCounter = 0;
     }
+    
     function hardDrop() { while (!collide(piece.matrix, piece.x, piece.y + 1)) { piece.y++; } playerDrop(); }
 
     function clearLines() {
@@ -512,29 +583,75 @@
             for (let x = 0; x < COLS; ++x) if (board[y][x] === 0) continue outer;
             const row = board.splice(y, 1)[0].fill(0); board.unshift(row); ++y; linesCleared++;
         }
+        
         if (linesCleared > 0) {
-            const basePoints = [0, 100, 300, 500, 800]; score += basePoints[linesCleared] * level; lines += linesCleared;
+            const basePoints = [0, 100, 300, 500, 800]; 
+            score += basePoints[linesCleared] * level; 
+            lines += linesCleared;
+            
             const newLevel = Math.min(MAX_LEVEL, Math.floor(lines / 10) + 1);
-            if (newLevel > level) { level = newLevel; showLevelUp(level); updateSpeed(); }
-            updateUI();
+            
+            if (newLevel > level) { 
+                level = newLevel; 
+                triggerLevelUpPhoto(); 
+            } else {
+                updateUI();
+            }
         }
     }
 
-    function updateSpeed() { dropInterval = Math.max(50, 1000 - ((level - 1) * 9.5)); }
-    function showLevelUp(lvl) {
-        levelText.innerText = `LEVEL ${lvl}`; levelBanner.classList.remove('show'); void levelBanner.offsetWidth; levelBanner.classList.add('show');
-        setTimeout(() => levelBanner.classList.remove('show'), 1500);
+    function triggerLevelUpPhoto() {
+        isLevelTransition = true; 
+        if(reqId) cancelAnimationFrame(reqId);
+        
+        btnPause.disabled = true;
+        btnStop.disabled = true;
+
+        const randomIndex = Math.floor(Math.random() * SECRET_IMAGES.length);
+        clearPhoto.src = SECRET_IMAGES[randomIndex];
+        
+        photoOverlay.style.display = 'flex';
+        updateUI(); 
     }
+
+    photoOverlay.addEventListener('pointerdown', (e) => {
+        if (!isLevelTransition) return;
+        e.preventDefault();
+
+        photoOverlay.style.display = 'none';
+        
+        levelText.innerText = `LEVEL ${level}`; 
+        levelBanner.classList.remove('show'); void levelBanner.offsetWidth; levelBanner.classList.add('show');
+        setTimeout(() => levelBanner.classList.remove('show'), 1500);
+
+        updateSpeed();
+        isLevelTransition = false;
+        btnPause.disabled = false;
+        btnStop.disabled = false;
+        
+        spawnPiece();
+        lastTime = performance.now();
+        update(lastTime);
+    });
+
+    function updateSpeed() { dropInterval = Math.max(50, 1000 - ((level - 1) * 9.5)); }
+    
     function updateUI() { scoreElem.innerText = score; levelElem.innerText = level; linesElem.innerText = lines; }
+    
     function spawnPiece() {
         if (nextPieceType === null) nextPieceType = randomPiece();
         piece = createPieceObj(nextPieceType); nextPieceType = randomPiece(); drawNextPiece();
     }
 
     function update(time = 0) {
-        if (!isPlaying || isPaused) return;
+        if (!isPlaying || isPaused || isLevelTransition) return;
+        
         const deltaTime = time - lastTime; lastTime = time; dropCounter += deltaTime;
+        
         if (dropCounter > dropInterval) playerDrop();
+        
+        if (!isPlaying || isPaused || isLevelTransition) return;
+
         draw();
         reqId = requestAnimationFrame(update);
     }
@@ -542,13 +659,19 @@
     function startGame() {
         board = createBoard(); score = 0; level = 1; lines = 0; nextPieceType = null;
         updateSpeed(); updateUI(); spawnPiece();
-        isPlaying = true; isPaused = false; overlay.style.display = 'none';
+        
+        isPlaying = true; isPaused = false; isLevelTransition = false;
+        overlay.style.display = 'none';
+        photoOverlay.style.display = 'none'; 
+        
         btnStart.disabled = true; btnPause.disabled = false; btnStop.disabled = false; btnPause.innerText = 'Pause';
+        
         lastTime = performance.now(); if(reqId) cancelAnimationFrame(reqId); update(lastTime);
     }
 
     function togglePause() {
-        if (!isPlaying) return;
+        if (!isPlaying || isLevelTransition) return; 
+        
         isPaused = !isPaused;
         if (isPaused) {
             overlayTitle.innerText = "PAUSED"; overlayDesc.innerText = "Press Resume to continue"; overlay.style.display = 'flex'; btnPause.innerText = 'Resume';
@@ -558,20 +681,23 @@
     }
 
     function stopGame() {
-        isPlaying = false; isPaused = false; if(reqId) cancelAnimationFrame(reqId);
+        isPlaying = false; isPaused = false; isLevelTransition = false;
+        if(reqId) cancelAnimationFrame(reqId);
+        
         overlayTitle.innerText = "STOPPED"; overlayTitle.style.color = "#fff"; overlayDesc.innerText = `Final Score: ${score}`; overlay.style.display = 'flex';
         btnStart.disabled = false; btnPause.disabled = true; btnStop.disabled = true; btnStart.innerText = 'Restart';
     }
 
     function gameOver() {
-        isPlaying = false; if(reqId) cancelAnimationFrame(reqId);
+        isPlaying = false; isLevelTransition = false;
+        if(reqId) cancelAnimationFrame(reqId);
+        
         overlayTitle.innerText = "GAME OVER"; overlayTitle.style.color = "#ff0055"; overlayDesc.innerText = `Reached Level ${level} | Score: ${score}`; overlay.style.display = 'flex';
         btnStart.disabled = false; btnPause.disabled = true; btnStop.disabled = true; btnStart.innerText = 'Try Again';
     }
 
-    // 키보드 이벤트 (PC)
     document.addEventListener('keydown', event => {
-        if (!isPlaying || isPaused) return;
+        if (!isPlaying || isPaused || isLevelTransition) return; 
         switch (event.keyCode) {
             case 37: playerMove(-1); draw(); break;
             case 39: playerMove(1); draw(); break;
@@ -585,7 +711,6 @@
     btnPause.addEventListener('click', togglePause);
     btnStop.addEventListener('click', stopGame);
 
-    // 강력한 모바일 터치 이벤트 핸들링 (Pointer Events 사용)
     function setupTouchButton(id, actionOnDown, continuous = false) {
         const btn = document.getElementById(id);
         if (!btn) return;
@@ -595,22 +720,25 @@
 
         const startAction = (e) => {
             if(e.cancelable) e.preventDefault();
-            if (!isPlaying || isPaused || isPressed) return;
+            if (!isPlaying || isPaused || isLevelTransition || isPressed) return;
             
             isPressed = true;
-            btn.classList.add('active'); // 시각적 피드백
+            btn.classList.add('active'); 
             
             actionOnDown();
             draw();
 
             if (continuous) {
-                // 첫 입력 후 약간의 딜레이 후 연속 입력 시작
                 setTimeout(() => {
                     if(isPressed) {
                         intervalId = setInterval(() => {
+                            if (!isPlaying || isPaused || isLevelTransition) {
+                                clearInterval(intervalId);
+                                return;
+                            }
                             actionOnDown();
                             draw();
-                        }, 80); // 연속 이동 속도
+                        }, 80); 
                     }
                 }, 200);
             }
@@ -623,24 +751,19 @@
             clearInterval(intervalId);
         };
 
-        // Pointer Events (모던 브라우저 및 터치 기기 호환성 향상)
         btn.addEventListener('pointerdown', startAction);
         btn.addEventListener('pointerup', stopAction);
         btn.addEventListener('pointerout', stopAction);
         btn.addEventListener('pointercancel', stopAction);
         
-        // 기존 터치 이벤트(보조)
         btn.addEventListener('touchstart', startAction, {passive: false});
         btn.addEventListener('touchend', stopAction, {passive: false});
         btn.addEventListener('touchcancel', stopAction, {passive: false});
     }
 
-    // 버튼 연결 (좌/우/아래는 꾹 누르면 연속 동작)
     setupTouchButton('btn-t-left', () => playerMove(-1), true);
     setupTouchButton('btn-t-right', () => playerMove(1), true);
     setupTouchButton('btn-t-down', () => playerDrop(), true);
-    
-    // 회전/하드드롭은 누를 때마다 한 번씩만 동작
     setupTouchButton('btn-t-up', () => playerRotate(), false);
     setupTouchButton('btn-t-drop', () => hardDrop(), false);
 
