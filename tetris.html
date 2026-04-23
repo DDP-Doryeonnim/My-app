@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Premium Tetris (Final Fixed)</title>
+    <title>Premium Tetris (Final Master Edition)</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
 
@@ -29,15 +29,15 @@
             user-select: none;
         }
 
-        /* 전체 레이아웃 구조 */
+        /* [PC 레이아웃] 원본 디자인 구조 복원 */
         #game-wrapper {
             display: flex;
             flex-direction: row;
             gap: 20px;
-            padding: 20px;
+            padding: 25px;
             background: var(--panel-bg);
             border-radius: 15px;
-            box-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.9);
             border: 1px solid var(--border-color);
             max-width: 95vw;
             max-height: 95vh;
@@ -48,28 +48,28 @@
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            width: 140px;
+            width: 150px;
         }
 
         .info-box {
             background: rgba(0, 0, 0, 0.5);
             border: 1px solid var(--border-color);
             border-radius: 8px;
-            padding: 10px;
+            padding: 12px;
             text-align: center;
             margin-bottom: 10px;
         }
 
-        .info-title { font-size: 0.65rem; color: #888; text-transform: uppercase; margin-bottom: 5px; }
-        .info-value { font-size: 1.1rem; font-weight: 700; color: var(--accent-color); }
+        .info-title { font-size: 0.7rem; color: #888; text-transform: uppercase; margin-bottom: 6px; letter-spacing: 1px; }
+        .info-value { font-size: 1.2rem; font-weight: 700; color: var(--accent-color); text-shadow: 0 0 10px var(--accent-color); }
 
-        /* 게임 보드 */
+        /* 중앙 게임판 가시성 확보 */
         .canvas-container {
             position: relative;
             background: #000;
             border: 2px solid var(--border-color);
             border-radius: 5px;
-            box-shadow: 0 0 15px rgba(0, 0, 0, 0.9);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 1);
             overflow: hidden;
         }
 
@@ -77,11 +77,10 @@
             display: block;
             width: 300px;
             height: 600px;
+            background-color: #000;
         }
 
-        #next-piece { width: 80px; height: 80px; }
-
-        /* 오버레이 */
+        /* 텍스트 오버레이 */
         #overlay, #level-banner {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -96,7 +95,7 @@
 
         @keyframes popIn {
             0% { transform: scale(0.5); opacity: 0; }
-            20% { transform: scale(1.1); opacity: 1; color: gold; text-shadow: 0 0 10px gold; }
+            20% { transform: scale(1.1); opacity: 1; color: gold; text-shadow: 0 0 20px gold; }
             80% { transform: scale(1); opacity: 1; }
             100% { transform: scale(1.5); opacity: 0; }
         }
@@ -105,7 +104,7 @@
         #photo-overlay {
             position: fixed;
             top: 0; left: 0; width: 100vw; height: 100vh;
-            background: rgba(0, 0, 0, 0.95);
+            background: rgba(0, 0, 0, 0.98);
             z-index: 1000;
             display: none;
             flex-direction: column;
@@ -116,53 +115,59 @@
             max-width: 90vw; max-height: 80vh;
             border: 2px solid var(--accent-color);
             border-radius: 10px;
+            box-shadow: 0 0 30px var(--accent-color);
         }
 
         /* 컨트롤 버튼 */
-        .controls { display: flex; flex-direction: column; gap: 8px; }
+        .controls { display: flex; flex-direction: column; gap: 10px; }
         button {
             background: linear-gradient(135deg, #2c2c3a, #1a1a24);
             color: var(--text-color);
             border: 1px solid var(--border-color);
-            padding: 10px; border-radius: 8px;
-            font-family: 'Orbitron', sans-serif; font-size: 0.8rem;
+            padding: 12px; border-radius: 8px;
+            font-family: 'Orbitron', sans-serif; font-size: 0.85rem;
             cursor: pointer; transition: 0.2s;
+            text-transform: uppercase;
         }
         button:active { transform: scale(0.95); border-color: var(--accent-color); }
-        button:disabled { opacity: 0.4; cursor: not-allowed; }
+        button:disabled { opacity: 0.3; cursor: not-allowed; }
 
         .touch-controls { display: none; }
 
-        /* 모바일 반응형 디자인 */
+        /* [모바일 레이아웃] 반응형 구조 최적화 */
         @media (max-width: 768px) {
-            #game-wrapper { flex-direction: column; padding: 10px; width: 100%; height: 100%; border: none; border-radius: 0; }
-            .side-panel { width: 100%; flex-direction: row; gap: 5px; }
+            #game-wrapper { flex-direction: column; padding: 15px; width: 100%; height: 100%; border: none; border-radius: 0; gap: 10px; }
+            .side-panel { width: 100%; flex-direction: row; gap: 8px; justify-content: center; }
             .info-wrapper { display: flex; flex: 1; gap: 5px; }
-            .info-box { flex: 1; margin-bottom: 0; padding: 5px; }
-            .info-value { font-size: 0.9rem; }
-            #board { width: auto; height: 100%; max-height: 55vh; aspect-ratio: 1/2; }
+            .info-box { flex: 1; margin-bottom: 0; padding: 8px; }
+            .info-value { font-size: 1rem; }
+            .info-title { font-size: 0.55rem; }
+            
+            .canvas-container { flex: 1; display: flex; align-items: center; justify-content: center; }
+            #board { width: auto; height: 100%; max-height: 50vh; aspect-ratio: 1/2; }
+            
             .bottom-panel { flex-direction: column; gap: 10px; }
-            .top-controls { display: flex; flex-direction: row; align-items: center; gap: 10px; }
-            .controls { flex-direction: row; flex: 1; }
-            .controls button { flex: 1; padding: 12px 5px; }
-            #next-piece-container { width: 60px; height: 60px; }
-            #next-piece { width: 50px; height: 50px; }
+            .top-controls { display: flex; flex-direction: row; align-items: center; gap: 10px; width: 100%; }
+            .controls { flex-direction: row; flex: 1; gap: 5px; }
+            .controls button { flex: 1; padding: 12px 2px; font-size: 0.75rem; }
+            #next-piece-container { width: 70px; height: 70px; display: flex; align-items: center; justify-content: center; margin: 0; }
+            #next-piece { width: 55px; height: 55px; }
             
             .touch-controls {
                 display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(2, 1fr);
-                gap: 8px; width: 100%; padding-bottom: 10px;
+                gap: 10px; width: 100%; padding-bottom: 15px;
             }
             .t-btn {
-                background: #2a2a35; font-size: 1.5rem; height: 55px;
+                background: #2a2a35; font-size: 1.6rem; height: 60px;
                 display: flex; justify-content: center; align-items: center;
-                border-radius: 8px; border: 1px solid var(--border-color); color: #fff;
+                border-radius: 10px; border: 1px solid var(--border-color); color: #fff;
             }
-            .t-btn:active { background: var(--accent-color); color: #000; }
+            .t-btn:active { background: var(--accent-color); color: #000; box-shadow: 0 0 15px var(--accent-color); }
             #btn-t-up { grid-column: 2 / 3; grid-row: 1 / 2; }
             #btn-t-left { grid-column: 1 / 2; grid-row: 2 / 3; }
             #btn-t-down { grid-column: 2 / 3; grid-row: 2 / 3; }
             #btn-t-right { grid-column: 3 / 4; grid-row: 2 / 3; }
-            #btn-t-drop { grid-column: 4 / 5; grid-row: 1 / 3; background: #4a1a24; height: auto; border-color: #ff0055; font-size: 2rem; }
+            #btn-t-drop { grid-column: 4 / 5; grid-row: 1 / 3; background: #5a1a24; height: auto; border-color: #ff0055; font-size: 2.2rem; }
         }
     </style>
 </head>
@@ -175,17 +180,13 @@
             <div class="info-box"><div class="info-title">Level</div><div class="info-value" id="level-display">1</div></div>
             <div class="info-box"><div class="info-title">Lines</div><div class="info-value" id="lines-display">0</div></div>
         </div>
-        <div class="info-box" style="display: none;" id="pc-hint">
-            <div class="info-title">Hint</div>
-            <div style="font-size: 0.6rem; color: #666; text-align: left;">↑: Rotate<br>← →: Move<br>↓: Soft Drop<br>Space: Hard</div>
-        </div>
     </div>
 
     <div class="canvas-container">
         <canvas id="board" width="300" height="600"></canvas>
         <div id="overlay">
             <h2 id="overlay-title">TETRIS</h2>
-            <p id="overlay-desc" style="font-size: 0.7rem; color:#888;">Press Start to Play</p>
+            <p id="overlay-desc" style="color:#aaa; font-size:0.8rem;">Press Start to Play</p>
         </div>
         <div id="level-banner"><h1 id="level-text">LEVEL UP</h1></div>
     </div>
@@ -214,13 +215,15 @@
 
 <div id="photo-overlay">
     <img id="clear-photo" src="" alt="Cleared Photo">
-    <div style="color: var(--accent-color); margin-top:20px; font-weight:bold;">Tap to Continue</div>
-    <div id="debug-text" style="color:#ff5555; font-size:0.7rem; margin-top:10px;"></div>
+    <div style="color: var(--accent-color); margin-top:25px; font-weight:bold; font-size:1.2rem;">Tap to Continue</div>
+    <div id="debug-text" style="color:#ff5555; font-size:0.7rem; margin-top:15px;"></div>
 </div>
 
 <script>
+    // 경로 일관성을 위한 상대 경로 설정 (file:// 및 http:// 공용)
     const SECRET_IMAGES = Array.from({length: 44}, (_, i) => `./YoomiImage/Youmi${String(i + 1).padStart(3, '0')}.jpg`);
-    const COLS = 10, ROWS = 20;
+    
+    const COLS = 10, ROWS = 20, BLOCK_SIZE = 30; // 내부 논리적 사이즈는 30으로 고정
     const canvas = document.getElementById('board'), ctx = canvas.getContext('2d');
     const nextCanvas = document.getElementById('next-piece'), nextCtx = nextCanvas.getContext('2d');
     const scoreElem = document.getElementById('score-display'), levelElem = document.getElementById('level-display'), linesElem = document.getElementById('lines-display');
@@ -234,7 +237,7 @@
     let isPlaying = false, isPaused = false, isLevelTransition = false;
     let dropCounter = 0, dropInterval = 1000, lastTime = 0, reqId = null;
 
-    // HEX를 RGBA로 변환 (모바일 고스트 블럭 버그 방지용)
+    // 모바일 렌더링 버그 방지를 위한 RGBA 변환 함수
     function hexToRgba(hex, alpha) {
         const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
         return `rgba(${r}, ${g}, ${b}, ${alpha})`;
@@ -244,42 +247,46 @@
     function randomPiece() { return Math.floor(Math.random() * 7) + 1; }
     function createPieceObj(type) { return { matrix: SHAPES[type], x: Math.floor(COLS / 2) - Math.floor(SHAPES[type][0].length / 2), y: 0, type: type }; }
 
+    // [버그 해결] 정수 좌표 드로잉 및 개별 투명도 적용
     function drawBlock(context, x, y, colorStr, size, isGhost = false) {
-        const px = Math.floor(x * size), py = Math.floor(y * size), s = Math.ceil(size);
-        context.fillStyle = isGhost ? hexToRgba(colorStr, 0.2) : colorStr;
-        if (!isGhost) { context.shadowBlur = 5; context.shadowColor = colorStr; }
+        const px = Math.floor(x * size), py = Math.floor(y * size), s = size;
+        
+        context.fillStyle = isGhost ? hexToRgba(colorStr, 0.18) : colorStr;
+        if (!isGhost) { context.shadowBlur = 6; context.shadowColor = colorStr; }
+        
         context.fillRect(px + 1, py + 1, s - 2, s - 2);
         context.shadowBlur = 0;
+
         if (!isGhost) {
-            context.fillStyle = 'rgba(255,255,255,0.2)'; context.fillRect(px + 1, py + 1, s - 2, s * 0.15);
-            context.fillStyle = 'rgba(0,0,0,0.1)'; context.fillRect(px + 1, py + s * 0.85, s - 2, s * 0.15);
+            context.fillStyle = 'rgba(255,255,255,0.25)'; context.fillRect(px + 1, py + 1, s - 2, s * 0.15);
+            context.fillStyle = 'rgba(0,0,0,0.15)'; context.fillRect(px + 1, py + s * 0.85, s - 2, s * 0.15);
         }
     }
 
     function draw() {
-        const currentBlockSize = canvas.width / COLS; // [모바일 공중부양 방지]
+        // [모바일 공중부양 방지] 논리적 해상도(300x600) 내에서 드로잉 고정
         ctx.fillStyle = '#000'; ctx.fillRect(0, 0, canvas.width, canvas.height);
         
-        // 격자선 (경계 파악용)
+        // 격자선 가이드
         ctx.strokeStyle = '#111'; ctx.lineWidth = 1;
-        for(let i=0; i<=COLS; i++) { ctx.beginPath(); ctx.moveTo(i*currentBlockSize, 0); ctx.lineTo(i*currentBlockSize, canvas.height); ctx.stroke(); }
-        for(let j=0; j<=ROWS; j++) { ctx.beginPath(); ctx.moveTo(0, j*currentBlockSize); ctx.lineTo(canvas.width, j*currentBlockSize); ctx.stroke(); }
+        for(let i=0; i<=COLS; i++) { ctx.beginPath(); ctx.moveTo(i*BLOCK_SIZE, 0); ctx.lineTo(i*BLOCK_SIZE, canvas.height); ctx.stroke(); }
+        for(let j=0; j<=ROWS; j++) { ctx.beginPath(); ctx.moveTo(0, j*BLOCK_SIZE); ctx.lineTo(canvas.width, j*BLOCK_SIZE); ctx.stroke(); }
 
-        board.forEach((row, y) => row.forEach((v, x) => { if (v > 0) drawBlock(ctx, x, y, COLORS[v], currentBlockSize); }));
+        board.forEach((row, y) => row.forEach((v, x) => { if (v > 0) drawBlock(ctx, x, y, COLORS[v], BLOCK_SIZE); }));
 
         if (piece && !isPaused && !isLevelTransition) {
             let ghostY = piece.y;
             while (!collide(piece.matrix, piece.x, ghostY + 1)) ghostY++;
-            // [버그 수정] 모든 고스트 블록 조각에 동일한 RGBA 적용
-            piece.matrix.forEach((row, y) => row.forEach((v, x) => { if (v !== 0) drawBlock(ctx, piece.x + x, ghostY + y, COLORS[piece.type], currentBlockSize, true); }));
-            piece.matrix.forEach((row, y) => row.forEach((v, x) => { if (v !== 0) drawBlock(ctx, piece.x + x, piece.y + y, COLORS[piece.type], currentBlockSize, false); }));
+            // [고스트 버그 수정] 모든 조각에 독립 RGBA 적용
+            piece.matrix.forEach((row, y) => row.forEach((v, x) => { if (v !== 0) drawBlock(ctx, piece.x + x, ghostY + y, COLORS[piece.type], BLOCK_SIZE, true); }));
+            piece.matrix.forEach((row, y) => row.forEach((v, x) => { if (v !== 0) drawBlock(ctx, piece.x + x, piece.y + y, COLORS[piece.type], BLOCK_SIZE, false); }));
         }
     }
 
     function drawNextPiece() {
         nextCtx.fillStyle = '#000'; nextCtx.fillRect(0, 0, nextCanvas.width, nextCanvas.height);
         if(!nextPieceType) return;
-        const m = SHAPES[nextPieceType], s = nextCanvas.width / 5;
+        const m = SHAPES[nextPieceType], s = 22;
         const ox = (nextCanvas.width - m[0].length * s) / 2, oy = (nextCanvas.height - m.length * s) / 2;
         m.forEach((row, y) => row.forEach((v, x) => { if (v !== 0) drawBlock(nextCtx, (ox/s)+x, (oy/s)+y, COLORS[nextPieceType], s); }));
     }
@@ -326,8 +333,8 @@
     function triggerLevelUpPhoto() {
         isLevelTransition = true; if(reqId) cancelAnimationFrame(reqId);
         btnPause.disabled = btnStop.disabled = true;
-        const imgPath = SECRET_IMAGES[Math.floor(Math.random() * SECRET_IMAGES.length)];
-        clearPhoto.src = imgPath; photoOverlay.style.display = 'flex'; updateUI();
+        clearPhoto.src = SECRET_IMAGES[Math.floor(Math.random() * SECRET_IMAGES.length)];
+        photoOverlay.style.display = 'flex'; updateUI();
     }
 
     photoOverlay.addEventListener('pointerdown', () => {
@@ -343,11 +350,11 @@
 
     clearPhoto.onerror = function() {
         if (this.src.includes('.jpg')) this.src = this.src.replace('.jpg', '.JPG');
-        else document.getElementById('debug-text').innerText = "Image Not Found: " + decodeURI(this.src);
+        else document.getElementById('debug-text').innerText = "Image Path Error: " + decodeURI(this.src);
     };
 
     function updateUI() { scoreElem.innerText = score; levelElem.innerText = level; linesElem.innerText = lines; }
-    function spawnPiece() { nextPieceType = nextPieceType || randomPiece(); piece = createPieceObj(nextPieceType); nextPieceType = randomPiece(); drawNextPiece(); dropInterval = Math.max(50, 1000 - ((level - 1) * 100)); }
+    function spawnPiece() { nextPieceType = nextPieceType || randomPiece(); piece = createPieceObj(nextPieceType); nextPieceType = randomPiece(); drawNextPiece(); dropInterval = Math.max(50, 1000 - ((level - 1) * 90)); }
 
     function update(time = 0) {
         if (!isPlaying || isPaused || isLevelTransition) return;
@@ -373,8 +380,8 @@
 
     function gameOver(txt = "GAME OVER") {
         isPlaying = false; cancelAnimationFrame(reqId);
-        document.getElementById('overlay-title').innerText = txt;
-        document.getElementById('overlay-title').style.color = (txt === "STOPPED") ? "#fff" : "#ff0055";
+        const title = document.getElementById('overlay-title');
+        title.innerText = txt; title.style.color = (txt === "STOPPED") ? "#fff" : "#ff0055";
         document.getElementById('overlay').style.display = 'flex';
         btnStart.disabled = false; btnPause.disabled = btnStop.disabled = true;
     }
