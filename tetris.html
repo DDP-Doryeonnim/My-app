@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Premium Tetris (Mobile Control Fixed)</title>
+    <title>Premium Tetris (Ultimate Master Edition)</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
 
@@ -30,7 +30,7 @@
             -webkit-user-select: none;
         }
 
-        /* [PC 레이아웃] 원본 디자인 구조 복원 */
+        /* [전체 구조] PC 3단 레이아웃 */
         #game-wrapper {
             display: flex;
             flex-direction: row;
@@ -54,7 +54,7 @@
             background: rgba(0, 0, 0, 0.5);
             border: 1px solid var(--border-color);
             border-radius: 8px;
-            padding: 10px;
+            padding: 12px;
             text-align: center;
             margin-bottom: 12px;
             box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
@@ -74,6 +74,9 @@
             border-radius: 5px;
             box-shadow: 0 0 15px rgba(0, 0, 0, 0.9);
             overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         #board {
@@ -88,11 +91,10 @@
             top: 0; left: 0; width: 100%; height: 100%;
             display: flex; justify-content: center; align-items: center;
             flex-direction: column;
-            background: rgba(0, 0, 0, 0.75);
+            background: rgba(0, 0, 0, 0.8);
             z-index: 10;
             text-align: center;
         }
-
         #overlay h2 { font-size: 1.8rem; margin: 0; color: #fff; text-shadow: 0 0 10px #fff; }
         #overlay p { color: #aaa; font-size: 0.8rem; margin-top: 10px; }
 
@@ -102,7 +104,6 @@
         @keyframes popIn {
             0% { transform: scale(0.5); opacity: 0; }
             20% { transform: scale(1.2); opacity: 1; color: gold; text-shadow: 0 0 20px gold; }
-            80% { transform: scale(1); opacity: 1; }
             100% { transform: scale(1.5); opacity: 0; }
         }
 
@@ -112,16 +113,12 @@
             background: linear-gradient(135deg, #2c2c3a, #1a1a24);
             color: var(--text-color);
             border: 1px solid var(--border-color);
-            padding: 12px;
-            border-radius: 8px;
-            font-family: 'Orbitron', sans-serif;
-            font-size: 0.9rem;
-            cursor: pointer;
-            transition: all 0.2s;
-            text-transform: uppercase;
+            padding: 12px; border-radius: 8px;
+            font-family: 'Orbitron', sans-serif; font-size: 0.85rem;
+            cursor: pointer; transition: 0.2s; text-transform: uppercase;
         }
         button:active { transform: scale(0.95); border-color: var(--accent-color); }
-        button:disabled { opacity: 0.4; cursor: not-allowed; }
+        button:disabled { opacity: 0.3; cursor: not-allowed; }
 
         .touch-controls { display: none; }
 
@@ -143,51 +140,60 @@
             box-shadow: 0 0 30px var(--accent-color);
         }
 
-        /* [모바일 레이아웃] 반응형 전환 */
+        /* [모바일] 화면 가득 채우기 및 버튼 위치 수정 */
         @media (max-width: 768px) {
-            #game-wrapper { flex-direction: column; padding: 10px; width: 100%; height: 100%; border-radius: 0; border: none; }
+            #game-wrapper { 
+                flex-direction: column; 
+                padding: 15px; 
+                width: 100%; 
+                height: 100vh; /* 화면 가득 채우기 */
+                border: none; 
+                border-radius: 0; 
+                gap: 10px; 
+            }
             .side-panel { width: 100%; flex-direction: row; gap: 5px; height: auto; }
             .info-wrapper { display: flex; flex: 1; gap: 5px; }
-            .info-box { flex: 1; margin-bottom: 0; padding: 5px; }
-            .info-value { font-size: 0.9rem; }
+            .info-box { flex: 1; margin-bottom: 0; padding: 8px; }
+            .info-value { font-size: 1rem; }
             .hint-box { display: none; }
 
-            .canvas-container { flex: 1; width: auto; height: auto; max-height: 55vh; aspect-ratio: 1/2; margin: 0 auto; }
-            #board { width: auto; height: 100%; }
+            .canvas-container { 
+                flex: 1; /* 남는 공간을 보드가 차지하여 아래 공간 제거 */
+                width: 100%; 
+                margin: 0 auto; 
+            }
+            #board { 
+                height: 100%; 
+                width: auto; 
+                max-width: 100%; 
+                aspect-ratio: 1/2; 
+            }
 
-            .bottom-panel { display: flex; flex-direction: column; gap: 10px; }
-            .top-controls { display: flex; flex-direction: row; align-items: center; gap: 10px; }
+            .bottom-panel { flex-direction: column; gap: 10px; flex-shrink: 0; }
+            .top-controls { display: flex; flex-direction: row; align-items: center; gap: 10px; width: 100%; }
             .controls { flex-direction: row; flex: 1; gap: 5px; }
-            .controls button { flex: 1; padding: 10px 5px; font-size: 0.75rem; }
-            #next-piece-container { width: 60px; height: 60px; margin: 0; display: flex; align-items: center; justify-content: center; }
+            .controls button { flex: 1; padding: 12px 2px; font-size: 0.75rem; }
+            #next-piece-container { width: 65px; height: 65px; margin: 0; display: flex; align-items: center; justify-content: center; }
             #next-piece { width: 50px; height: 50px; }
 
-            /* [수정] 터치 버튼 배치: 좌, 아래, 우, 빨리떨어지기, 회전 */
+            /* [버튼 위치 수정] 좌, 아래, 우, 빨리떨어지기, 회전(가장 오른쪽) */
             .touch-controls {
                 display: flex;
                 flex-direction: row;
                 gap: 8px;
                 width: 100%;
-                padding-bottom: 10px;
-                align-items: stretch;
+                padding-bottom: 15px;
             }
             .t-btn {
-                background: #2a2a35;
-                font-size: 1.4rem;
-                height: 65px;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                border-radius: 8px;
-                border: 1px solid var(--border-color);
-                color: #fff;
+                background: #2a2a35; font-size: 1.5rem; height: 60px;
+                display: flex; justify-content: center; align-items: center;
+                border-radius: 10px; border: 1px solid var(--border-color); color: #fff;
                 flex: 1;
             }
             .t-btn:active { background: var(--accent-color); color: #000; box-shadow: 0 0 15px var(--accent-color); }
             
-            /* [수정] 빨리떨어지기(⏬), 회전(↻) 순서 변경 및 크기 조정 */
-            #btn-t-drop { flex: 1.3; background: #4a1a24; border-color: #ff0055; }
-            #btn-t-up { flex: 1.8; background: #2a3a4a; border-color: var(--accent-color); font-size: 1.8rem; } /* 가장 오른쪽에 가장 크게 배치 */
+            #btn-t-drop { background: #4a1a24; border-color: #ff0055; flex: 1.2; } /* 빨리 내리기 */
+            #btn-t-up { background: #2a3a4a; border-color: var(--accent-color); flex: 1.6; font-size: 1.8rem; } /* 회전 (가장 오른쪽, 가장 크게) */
         }
     </style>
 </head>
@@ -219,7 +225,7 @@
 
     <div class="side-panel bottom-panel">
         <div class="top-controls">
-            <div class="info-box" id="next-piece-container" style="background: #000; padding: 5px;">
+            <div class="info-box" id="next-piece-container" style="background: #000; padding: 5px; margin-bottom: 0;">
                 <canvas id="next-piece" width="100" height="100"></canvas>
             </div>
             <div class="controls">
@@ -241,8 +247,8 @@
 
 <div id="photo-overlay">
     <img id="clear-photo" src="" alt="Cleared Photo">
-    <div style="color: var(--accent-color); margin-top:20px; font-weight:bold; font-size:1.1rem;">Tap to Continue</div>
-    <div id="debug-text" style="color:#ff5555; font-size:0.7rem; margin-top:10px;"></div>
+    <div style="color: var(--accent-color); margin-top:25px; font-weight:bold; font-size:1.2rem;">Tap to Continue</div>
+    <div id="debug-text" style="color:#ff5555; font-size:0.7rem; margin-top:15px;"></div>
 </div>
 
 <script>
@@ -271,14 +277,14 @@
     function createPieceObj(type) { return { matrix: SHAPES[type], x: Math.floor(COLS / 2) - Math.floor(SHAPES[type][0].length / 2), y: 0, type: type }; }
 
     function drawBlock(context, x, y, colorStr, size, isGhost = false) {
-        const px = Math.floor(x * size), py = Math.floor(y * size), s = Math.ceil(size);
+        const px = Math.floor(x * size), py = Math.floor(y * size), s = size;
         context.fillStyle = isGhost ? hexToRgba(colorStr, 0.18) : colorStr;
-        if (!isGhost) { context.shadowBlur = 5; context.shadowColor = colorStr; }
+        if (!isGhost) { context.shadowBlur = 6; context.shadowColor = colorStr; }
         context.fillRect(px + 1, py + 1, s - 2, s - 2);
         context.shadowBlur = 0;
         if (!isGhost) {
             context.fillStyle = 'rgba(255,255,255,0.2)'; context.fillRect(px + 1, py + 1, s - 2, s * 0.15);
-            context.fillStyle = 'rgba(0,0,0,0.1)'; context.fillRect(px + 1, py + s * 0.85, s - 2, s * 0.15);
+            context.fillStyle = 'rgba(0,0,0,0.15)'; context.fillRect(px + 1, py + s * 0.85, s - 2, s * 0.15);
         }
     }
 
@@ -287,9 +293,7 @@
         ctx.strokeStyle = '#111'; ctx.lineWidth = 1;
         for(let i=0; i<=COLS; i++) { ctx.beginPath(); ctx.moveTo(i*BLOCK_SIZE, 0); ctx.lineTo(i*BLOCK_SIZE, canvas.height); ctx.stroke(); }
         for(let j=0; j<=ROWS; j++) { ctx.beginPath(); ctx.moveTo(0, j*BLOCK_SIZE); ctx.lineTo(canvas.width, j*BLOCK_SIZE); ctx.stroke(); }
-
         board.forEach((row, y) => row.forEach((v, x) => { if (v > 0) drawBlock(ctx, x, y, COLORS[v], BLOCK_SIZE); }));
-
         if (piece && !isPaused && !isLevelTransition) {
             let ghostY = piece.y;
             while (!collide(piece.matrix, piece.x, ghostY + 1)) ghostY++;
@@ -369,7 +373,7 @@
     };
 
     function updateUI() { scoreElem.innerText = score; levelElem.innerText = level; linesElem.innerText = lines; }
-    function spawnPiece() { nextPieceType = nextPieceType || randomPiece(); piece = createPieceObj(nextPieceType); nextPieceType = randomPiece(); drawNextPiece(); dropInterval = Math.max(50, 1000 - ((level - 1) * 100)); }
+    function spawnPiece() { nextPieceType = nextPieceType || randomPiece(); piece = createPieceObj(nextPieceType); nextPieceType = randomPiece(); drawNextPiece(); dropInterval = Math.max(50, 1000 - ((level - 1) * 90)); }
 
     function update(time = 0) {
         if (!isPlaying || isPaused || isLevelTransition) return;
@@ -414,12 +418,9 @@
         const end = () => clearInterval(timer);
         b.addEventListener('pointerdown', start); b.addEventListener('pointerup', end); b.addEventListener('pointerleave', end);
     }
-    
-    // [수정] 버튼 조작 순서: 좌, 아래, 우, 빨리떨어지기(⏬), 회전(↻)
-    setupBtn('btn-t-left', () => playerMove(-1), true); 
-    setupBtn('btn-t-down', () => playerDrop(), true);
-    setupBtn('btn-t-right', () => playerMove(1), true);
-    setupBtn('btn-t-drop', () => hardDrop());
+    // [버튼 핸들러 연결 완료] 좌, 아래, 우, 빨리내리기, 회전(↺)
+    setupBtn('btn-t-left', () => playerMove(-1), true); setupBtn('btn-t-down', () => playerDrop(), true);
+    setupBtn('btn-t-right', () => playerMove(1), true); setupBtn('btn-t-drop', () => hardDrop());
     setupBtn('btn-t-up', () => playerRotate());
 
     draw(); drawNextPiece();
