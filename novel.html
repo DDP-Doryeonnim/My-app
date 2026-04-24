@@ -114,7 +114,7 @@
         let particles = [];
         let score = 0;
         let startTime = Date.now();
-        let finalTime = 0; // 최종 클리어 시간 저장용 변수
+        let finalTime = 0;
         let currentTargetNum = 1;
         let mouse = { x: 0, y: 0 };
         let isGameOver = false;
@@ -123,6 +123,55 @@
         const maxStage = 10; 
         let targetsInStage = 10;
         let stageTransitionTimer = 0;
+
+        // --- 사운드(Web Audio API) 설정 ---
+        let audioCtx;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playHitSound() {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            osc.type = 'sine'; // 부드럽고 맑은 소리
+            osc.frequency.setValueAtTime(600, audioCtx.currentTime); // 시작 주파수
+            osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.1); // 빠르게 높아지는 경쾌한 소리
+
+            gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.1);
+        }
+
+        function playMissSound() {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            osc.type = 'square'; // 둔탁하고 약간 거친 소리
+            osc.frequency.setValueAtTime(200, audioCtx.currentTime); 
+            osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.15); // 낮아지는 소리
+
+            gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.15);
+        }
+        // ---------------------------------
 
         function resize() {
             width = canvas.width = window.innerWidth;
@@ -289,6 +338,8 @@
         startStage(currentStage);
 
         canvas.addEventListener('mousedown', () => {
+            initAudio(); // 브라우저 사운드 정책 해결을 위한 초기화
+
             if (isGameOver) return;
             
             let isCorrectHit = false;
@@ -301,6 +352,8 @@
                     if (t.id === currentTargetNum) {
                         isCorrectHit = true;
                         
+                        playHitSound(); // 정답 타격음 재생
+
                         for (let j = 0; j < 40; j++) particles.push(new Particle(t.x, t.y, '#38bdf8'));
                         
                         targets.splice(i, 1);
@@ -313,7 +366,6 @@
                                 startStage(currentStage);
                             } else {
                                 isGameOver = true;
-                                // 마지막 스테이지 클리어 시 경과 시간을 저장
                                 finalTime = ((Date.now() - startTime) / 1000).toFixed(1);
                                 document.getElementById('target-display').innerText = 'WIN';
                             }
@@ -326,6 +378,8 @@
             }
 
             if (!isCorrectHit && !isGameOver) {
+                playMissSound(); // 오답(미스샷) 타격음 재생
+                
                 score -= 50;
                 if (score < 0) score = 0;
                 
@@ -398,28 +452,24 @@
                 stageTransitionTimer--;
             }
 
-            // 게임 오버(클리어) 텍스트 렌더링 수정 구역
             if (isGameOver) {
-                ctx.fillStyle = 'rgba(0,0,0,0.85)'; // 배경을 조금 더 어둡게
+                ctx.fillStyle = 'rgba(0,0,0,0.85)';
                 ctx.fillRect(0, 0, width, height);
 
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 
-                // MISSION COMPLETE
                 ctx.fillStyle = '#10b981';
                 ctx.font = 'bold 90px Syncopate';
                 ctx.shadowBlur = 20;
                 ctx.shadowColor = '#10b981';
                 ctx.fillText('MISSION COMPLETE', width / 2, height / 2 - 80);
 
-                // FINAL SCORE
                 ctx.fillStyle = '#38bdf8';
                 ctx.font = 'bold 60px Syncopate';
                 ctx.shadowColor = '#38bdf8';
                 ctx.fillText('SCORE : ' + score, width / 2, height / 2 + 30);
 
-                // FINAL TIME
                 ctx.fillStyle = '#f43f5e';
                 ctx.font = 'bold 50px Syncopate';
                 ctx.shadowColor = '#f43f5e';
