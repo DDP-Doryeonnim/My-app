@@ -20,10 +20,9 @@
 
         canvas {
             display: block;
-            cursor: none; /* 기본 마우스 커서 숨김 (커스텀 조준점 사용) */
+            cursor: none;
         }
 
-        /* HUD (Head-Up Display) 상단 UI 패널 */
         #hud {
             position: absolute;
             top: 30px;
@@ -64,7 +63,11 @@
             color: #f43f5e;
         }
 
-        /* 화면 테두리 어둡게 (비네팅 효과) */
+        #stage-display {
+            color: #10b981;
+            text-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+        }
+
         #vignette {
             position: absolute;
             top: 0;
@@ -82,6 +85,10 @@
     <div id="vignette"></div>
     
     <div id="hud">
+        <div class="stat-item">
+            <div class="stat-label">Stage</div>
+            <div id="stage-display" class="stat-value">01</div>
+        </div>
         <div class="stat-item">
             <div class="stat-label">Next Target</div>
             <div id="target-display" class="stat-value">01</div>
@@ -107,34 +114,49 @@
         let particles = [];
         let score = 0;
         let startTime = Date.now();
+        let finalTime = 0; // 최종 클리어 시간 저장용 변수
         let currentTargetNum = 1;
         let mouse = { x: 0, y: 0 };
         let isGameOver = false;
 
-        // 윈도우 리사이즈 처리
+        let currentStage = 1;
+        const maxStage = 10; 
+        let targetsInStage = 10;
+        let stageTransitionTimer = 0;
+
         function resize() {
             width = canvas.width = window.innerWidth;
             height = canvas.height = window.innerHeight;
         }
         window.addEventListener('resize', resize);
         
-        // 마우스 좌표 추적 (커스텀 조준점용)
         window.addEventListener('mousemove', e => {
             mouse.x = e.clientX;
             mouse.y = e.clientY;
         });
         resize();
 
-        // [핵심] 이미지 로드 (상대 경로 ./imahe/ 적용)
-        const images = {};
-        for (let i = 1; i <= 10; i++) {
-            const img = new Image();
-            const numStr = i < 10 ? `0${i}` : `${i}`;
-            img.src = `./imahe/image${numStr}.JPG`; 
-            images[i] = img;
-        }
+        const SECRET_IMAGES = [
+            'YoomiImage/Youmi001.jpg', 'YoomiImage/Youmi002.jpg', 'YoomiImage/Youmi003.jpg', 'YoomiImage/Youmi004.jpg',
+            'YoomiImage/Youmi005.jpg', 'YoomiImage/Youmi006.jpg', 'YoomiImage/Youmi007.jpg', 'YoomiImage/Youmi008.jpg',
+            'YoomiImage/Youmi009.jpg', 'YoomiImage/Youmi010.jpg', 'YoomiImage/Youmi011.jpg', 'YoomiImage/Youmi012.jpg',
+            'YoomiImage/Youmi013.jpg', 'YoomiImage/Youmi014.jpg', 'YoomiImage/Youmi015.jpg', 'YoomiImage/Youmi016.jpg',
+            'YoomiImage/Youmi017.jpg', 'YoomiImage/Youmi018.jpg', 'YoomiImage/Youmi019.jpg', 'YoomiImage/Youmi020.jpg',
+            'YoomiImage/Youmi021.jpg', 'YoomiImage/Youmi022.jpg', 'YoomiImage/Youmi023.jpg', 'YoomiImage/Youmi024.jpg',
+            'YoomiImage/Youmi025.jpg', 'YoomiImage/Youmi026.jpg', 'YoomiImage/Youmi027.jpg', 'YoomiImage/Youmi028.jpg',
+            'YoomiImage/Youmi029.jpg', 'YoomiImage/Youmi030.jpg', 'YoomiImage/Youmi031.jpg', 'YoomiImage/Youmi032.jpg',
+            'YoomiImage/Youmi033.jpg', 'YoomiImage/Youmi034.jpg', 'YoomiImage/Youmi035.jpg', 'YoomiImage/Youmi036.jpg',
+            'YoomiImage/Youmi037.jpg', 'YoomiImage/Youmi038.jpg', 'YoomiImage/Youmi039.jpg', 'YoomiImage/Youmi040.jpg',
+            'YoomiImage/Youmi041.jpg', 'YoomiImage/Youmi042.jpg', 'YoomiImage/Youmi043.jpg', 'YoomiImage/Youmi044.jpg'
+        ];
 
-        // 파티클 (폭발 효과) 클래스
+        const loadedImages = [];
+        SECRET_IMAGES.forEach(src => {
+            const img = new Image();
+            img.src = src;
+            loadedImages.push(img);
+        });
+
         class Particle {
             constructor(x, y, color) {
                 this.x = x;
@@ -170,18 +192,22 @@
             }
         }
 
-        // 타겟 (이미지 객체) 클래스
         class Target {
-            constructor(id) {
+            constructor(id, radius, speedMultiplier, img) {
                 this.id = id;
-                this.radius = 60;
+                this.radius = radius;
+                this.speedMultiplier = speedMultiplier;
+                this.img = img;
                 this.reset();
                 this.pulse = 0;
             }
             reset() {
-                this.x = Math.random() * (width - 120) + 60;
-                this.y = Math.random() * (height - 120) + 60;
-                const speed = 1.5 + (this.id * 0.3);
+                this.x = Math.random() * (width - this.radius * 4) + this.radius * 2;
+                this.y = Math.random() * (height - this.radius * 4) + this.radius * 2;
+                
+                const baseSpeed = 1.0 + (this.id * 0.15); 
+                const speed = baseSpeed * this.speedMultiplier;
+                
                 this.vx = (Math.random() - 0.5) * speed;
                 this.vy = (Math.random() - 0.5) * speed;
             }
@@ -189,7 +215,6 @@
                 this.x += this.vx;
                 this.y += this.vy;
                 
-                // 화면 밖으로 나가지 않게 튕기기
                 if (this.x < this.radius || this.x > width - this.radius) this.vx *= -1;
                 if (this.y < this.radius || this.y > height - this.radius) this.vy *= -1;
                 
@@ -200,7 +225,6 @@
                 ctx.shadowBlur = 20;
                 ctx.shadowColor = 'rgba(0,0,0,0.5)';
 
-                // 활성화된(맞춰야 할) 타겟 강조 효과
                 if (this.id === currentTargetNum) {
                     ctx.shadowBlur = 30;
                     ctx.shadowColor = '#f43f5e';
@@ -212,18 +236,15 @@
 
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-                ctx.clip(); // 이미지를 원형으로 자르기
+                ctx.clip(); 
 
-                const img = images[this.id];
-                // 이미지가 성공적으로 로드된 경우
-                if (img.complete && img.naturalWidth !== 0) {
-                    ctx.drawImage(img, this.x - this.radius, this.y - this.radius, this.radius * 2, this.radius * 2);
+                if (this.img && this.img.complete && this.img.naturalWidth !== 0) {
+                    ctx.drawImage(this.img, this.x - this.radius, this.y - this.radius, this.radius * 2, this.radius * 2);
                 } else {
-                    // 이미지 로드 실패 또는 지연 시 임시 UI
                     ctx.fillStyle = '#1e293b';
                     ctx.fill();
                     ctx.fillStyle = '#f8fafc';
-                    ctx.font = 'bold 30px Syncopate';
+                    ctx.font = `bold ${Math.max(10, this.radius * 0.8)}px Syncopate`;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillText(this.id < 10 ? `0${this.id}` : this.id, this.x, this.y);
@@ -231,7 +252,6 @@
 
                 ctx.restore();
 
-                // 테두리 렌더링
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
                 ctx.lineWidth = 3;
@@ -240,52 +260,90 @@
             }
         }
 
-        // 초기화: 타겟 10개 생성
-        for (let i = 1; i <= 10; i++) targets.push(new Target(i));
+        function startStage(stage) {
+            targets = [];
+            currentTargetNum = 1;
+            
+            targetsInStage = Math.floor(10 + (stage - 1) * (34 / 9));
+            if (targetsInStage > 44) targetsInStage = 44;
 
-        // 클릭(사격) 이벤트
+            const speedMultiplier = 1 + (stage - 1) * 0.4;
+
+            let shuffledImages = [...loadedImages].sort(() => 0.5 - Math.random());
+            let selectedImages = shuffledImages.slice(0, targetsInStage);
+
+            for (let i = 1; i <= targetsInStage; i++) {
+                const baseRadius = 60 - (stage - 1) * (40 / 9);
+                const variance = (stage - 1) * (25 / 9);
+                const randomRadius = baseRadius + (Math.random() * variance * 2 - variance);
+                const finalRadius = Math.max(10, randomRadius);
+
+                targets.push(new Target(i, finalRadius, speedMultiplier, selectedImages[i-1]));
+            }
+
+            document.getElementById('stage-display').innerText = stage.toString().padStart(2, '0');
+            document.getElementById('target-display').innerText = '01';
+            stageTransitionTimer = 120; 
+        }
+
+        startStage(currentStage);
+
         canvas.addEventListener('mousedown', () => {
             if (isGameOver) return;
             
-            // 겹쳐있을 경우를 대비해 역순(위쪽 레이어 먼저)으로 검사
+            let isCorrectHit = false;
+
             for (let i = targets.length - 1; i >= 0; i--) {
                 const t = targets[i];
                 const dist = Math.hypot(mouse.x - t.x, mouse.y - t.y);
                 
-                // 마우스가 타겟 원 반경 안에 있는지 확인
                 if (dist < t.radius) {
                     if (t.id === currentTargetNum) {
-                        // 정답 격추: 파티클 생성
+                        isCorrectHit = true;
+                        
                         for (let j = 0; j < 40; j++) particles.push(new Particle(t.x, t.y, '#38bdf8'));
                         
                         targets.splice(i, 1);
-                        score += 100 + (10 - targets.length) * 50;
+                        score += 100 + (targetsInStage - targets.length) * 50 * currentStage;
                         currentTargetNum++;
                         
-                        // UI 업데이트
-                        document.getElementById('score-display').innerText = score.toString().padStart(4, '0');
-                        document.getElementById('target-display').innerText = currentTargetNum <= 10 ? currentTargetNum.toString().padStart(2, '0') : 'WIN';
-                        
-                        // 게임 클리어 체크
-                        if (currentTargetNum > 10) isGameOver = true;
+                        if (currentTargetNum > targetsInStage) {
+                            if (currentStage < maxStage) {
+                                currentStage++;
+                                startStage(currentStage);
+                            } else {
+                                isGameOver = true;
+                                // 마지막 스테이지 클리어 시 경과 시간을 저장
+                                finalTime = ((Date.now() - startTime) / 1000).toFixed(1);
+                                document.getElementById('target-display').innerText = 'WIN';
+                            }
+                        } else {
+                            document.getElementById('target-display').innerText = currentTargetNum.toString().padStart(2, '0');
+                        }
                     }
-                    break; // 한 발로 여러 개가 동시에 지워지지 않도록
+                    break; 
                 }
             }
+
+            if (!isCorrectHit && !isGameOver) {
+                score -= 50;
+                if (score < 0) score = 0;
+                
+                for (let j = 0; j < 10; j++) particles.push(new Particle(mouse.x, mouse.y, '#f43f5e'));
+            }
+
+            document.getElementById('score-display').innerText = score.toString().padStart(4, '0');
         });
 
-        // 커스텀 조준점 그리기
         function drawCrosshair() {
             ctx.save();
             ctx.strokeStyle = '#38bdf8';
             ctx.lineWidth = 2;
             
-            // 조준점 외곽 원
             ctx.beginPath();
             ctx.arc(mouse.x, mouse.y, 20, 0, Math.PI * 2);
             ctx.stroke();
             
-            // 조준점 십자선
             ctx.beginPath();
             ctx.moveTo(mouse.x - 30, mouse.y);
             ctx.lineTo(mouse.x - 10, mouse.y);
@@ -297,7 +355,6 @@
             ctx.lineTo(mouse.x, mouse.y + 30);
             ctx.stroke();
 
-            // 조준점 중앙 점
             ctx.fillStyle = '#f43f5e';
             ctx.beginPath();
             ctx.arc(mouse.x, mouse.y, 3, 0, Math.PI * 2);
@@ -305,51 +362,73 @@
             ctx.restore();
         }
 
-        // 메인 애니메이션 루프
         function animate() {
-            // 잔상 효과 (살짝 투명하게 검은색을 덮어씌움)
             ctx.fillStyle = 'rgba(2, 6, 23, 0.25)';
             ctx.fillRect(0, 0, width, height);
 
-            // 시간 업데이트
             if (!isGameOver) {
                 const elapsed = (Date.now() - startTime) / 1000;
                 document.getElementById('time-display').innerText = elapsed.toFixed(1) + 's';
             }
 
-            // 타겟 렌더링
             targets.forEach(t => {
                 t.update();
                 t.draw();
             });
 
-            // 파티클 렌더링
             for (let i = particles.length - 1; i >= 0; i--) {
                 particles[i].update();
                 particles[i].draw();
                 if (particles[i].alpha <= 0) particles.splice(i, 1);
             }
 
-            // 커스텀 마우스 커서는 제일 위에 그림
             drawCrosshair();
 
-            // 게임 오버 화면 렌더링
-            if (isGameOver) {
-                ctx.fillStyle = 'rgba(0,0,0,0.7)';
-                ctx.fillRect(0,0,width,height);
-                ctx.fillStyle = '#10b981';
-                ctx.font = 'bold 80px Syncopate';
+            if (stageTransitionTimer > 0 && !isGameOver) {
+                ctx.save();
+                const alpha = Math.min(1, stageTransitionTimer / 30);
+                ctx.fillStyle = `rgba(16, 185, 129, ${alpha})`;
+                ctx.font = 'bold 120px Syncopate';
                 ctx.textAlign = 'center';
-                ctx.fillText('MISSION COMPLETE', width/2, height/2);
-                ctx.font = '30px Syncopate';
-                ctx.fillStyle = '#fff';
-                ctx.fillText('FINAL SCORE: ' + score, width/2, height/2 + 80);
+                ctx.textBaseline = 'middle';
+                ctx.shadowBlur = 30;
+                ctx.shadowColor = 'rgba(16, 185, 129, 0.8)';
+                ctx.fillText(`STAGE ${currentStage}`, width / 2, height / 2);
+                ctx.restore();
+                stageTransitionTimer--;
+            }
+
+            // 게임 오버(클리어) 텍스트 렌더링 수정 구역
+            if (isGameOver) {
+                ctx.fillStyle = 'rgba(0,0,0,0.85)'; // 배경을 조금 더 어둡게
+                ctx.fillRect(0, 0, width, height);
+
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                
+                // MISSION COMPLETE
+                ctx.fillStyle = '#10b981';
+                ctx.font = 'bold 90px Syncopate';
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = '#10b981';
+                ctx.fillText('MISSION COMPLETE', width / 2, height / 2 - 80);
+
+                // FINAL SCORE
+                ctx.fillStyle = '#38bdf8';
+                ctx.font = 'bold 60px Syncopate';
+                ctx.shadowColor = '#38bdf8';
+                ctx.fillText('SCORE : ' + score, width / 2, height / 2 + 30);
+
+                // FINAL TIME
+                ctx.fillStyle = '#f43f5e';
+                ctx.font = 'bold 50px Syncopate';
+                ctx.shadowColor = '#f43f5e';
+                ctx.fillText('TIME : ' + finalTime + 's', width / 2, height / 2 + 110);
             }
 
             requestAnimationFrame(animate);
         }
 
-        // 게임 시작
         animate();
     </script>
 </body>
