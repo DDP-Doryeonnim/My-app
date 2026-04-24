@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Jigsaw Solitaire Puzzle</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        header {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            letter-spacing: 2px;
+            color: #e0e0e0;
+        }
+
+        #levelDisplay {
+            font-size: 16px;
+            color: #b0b0b0;
+            margin-top: 5px;
+        }
+
+        #game-container {
+            position: relative;
+            width: 90vmin;
+            height: 90vmin;
+            max-width: 600px;
+            max-height: 600px;
+            background-color: #2a2a2a;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            padding: 5px;
+        }
+
+        #board {
+            display: grid;
+            width: 100%;
+            height: 100%;
+            gap: 2px;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .tile {
+            background-repeat: no-repeat;
+            cursor: pointer;
+            transition: transform 0.15s ease-in-out, filter 0.15s ease-in-out;
+            border-radius: 4px;
+        }
+
+        .tile.selected {
+            transform: scale(0.92);
+            filter: brightness(1.2);
+            box-shadow: 0 0 0 3px #ffb703 inset;
+            z-index: 10;
+        }
+
+        /* 탭 하면 다음 레벨로 넘어가는 오버레이 UI */
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            z-index: 100;
+            cursor: pointer;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .overlay-text {
+            font-size: 32px;
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+
+        .overlay-sub {
+            font-size: 16px;
+            color: #d1d1d1;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>JIGSAW PUZZLE</h1>
+        <div id="levelDisplay">Level 1</div>
+    </header>
+
+    <div id="game-container">
+        <div id="board"></div>
+        <div id="overlay" onclick="nextLevel()">
+            <div class="overlay-text">Level Cleared!</div>
+            <div class="overlay-sub">Tap to continue</div>
+        </div>
+    </div>
+
+    <script>
+        let currentLevel = 1;
+        let selectedTile = null;
+        let isInputLocked = false;
+
+        window.onload = () => {
+            initLevel();
+        };
+
+        function initLevel() {
+            isInputLocked = false;
+            
+            // 5레벨 단위로 조각 개수 증가 (1~5: 3x3, 6~10: 4x4, 11~15: 5x5 등)
+            const gridSize = 3 + Math.floor((currentLevel - 1) / 5);
+            
+            // 1~44 랜덤 이미지 선택
+            const imgNumber = Math.floor(Math.random() * 44) + 1;
+            const formattedNumber = String(imgNumber).padStart(3, '0');
+            const imageUrl = `YoomiImage/Youmi${formattedNumber}.jpg`; 
+
+            // UI 업데이트
+            document.getElementById('levelDisplay').innerText = `Level ${currentLevel}`;
+            
+            const board = document.getElementById('board');
+            board.innerHTML = '';
+            board.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
+            board.style.gridTemplateRows = `repeat(${gridSize}, 1fr)`;
+
+            let tiles = [];
+            const totalTiles = gridSize * gridSize;
+
+            for (let i = 0; i < totalTiles; i++) {
+                let tile = document.createElement('div');
+                tile.className = 'tile';
+                tile.dataset.correct = i;
+
+                // 배경 이미지 분할 계산
+                let row = Math.floor(i / gridSize);
+                let col = i % gridSize;
+                
+                let bgPosX = (gridSize > 1) ? (col / (gridSize - 1)) * 100 : 0;
+                let bgPosY = (gridSize > 1) ? (row / (gridSize - 1)) * 100 : 0;
+
+                tile.style.backgroundImage = `url('${imageUrl}')`;
+                tile.style.backgroundSize = `${gridSize * 100}% ${gridSize * 100}%`;
+                tile.style.backgroundPosition = `${bgPosX}% ${bgPosY}%`;
+
+                tile.addEventListener('click', () => handleTileClick(tile));
+                tiles.push(tile);
+                board.appendChild(tile);
+            }
+
+            // 퍼즐 섞기 (배경 포지션과 정답 데이터만 스와프하여 구조 유지)
+            for (let i = totalTiles - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                swapData(tiles[i], tiles[j]);
+            }
+        }
+
+        function handleTileClick(tile) {
+            if (isInputLocked) return;
+
+            if (!selectedTile) {
+                selectedTile = tile;
+                tile.classList.add('selected');
+            } else {
+                if (selectedTile !== tile) {
+                    swapData(selectedTile, tile);
+                    checkWin();
+                }
+                selectedTile.classList.remove('selected');
+                selectedTile = null;
+            }
+        }
+
+        function swapData(tileA, tileB) {
+            let tempBgPos = tileA.style.backgroundPosition;
+            let tempCorrect = tileA.dataset.correct;
+
+            tileA.style.backgroundPosition = tileB.style.backgroundPosition;
+            tileA.dataset.correct = tileB.dataset.correct;
+
+            tileB.style.backgroundPosition = tempBgPos;
+            tileB.dataset.correct = tempCorrect;
+        }
+
+        function checkWin() {
+            let tiles = document.querySelectorAll('.tile');
+            let isWin = true;
+
+            tiles.forEach((tile, index) => {
+                if (parseInt(tile.dataset.correct, 10) !== index) {
+                    isWin = false;
+                }
+            });
+
+            if (isWin) {
+                isInputLocked = true;
+                setTimeout(() => {
+                    document.getElementById('overlay').style.display = 'flex';
+                }, 300); // 완성 모습을 0.3초 보여준 뒤 오버레이 표시
+            }
+        }
+
+        function nextLevel() {
+            document.getElementById('overlay').style.display = 'none';
+            currentLevel++;
+            initLevel();
+        }
+    </script>
+</body>
+</html>
