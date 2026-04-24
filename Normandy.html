@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>노르망디 방어선</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: #111;
+            overflow: hidden;
+            touch-action: none;
+            font-family: 'Courier New', Courier, monospace;
+            color: white;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        #ui {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            pointer-events: none;
+            text-shadow: 2px 2px 4px #000;
+            z-index: 5;
+        }
+        h1, p { margin: 5px 0; }
+        #startScreen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            background: rgba(0,0,0,0.85);
+            padding: 40px;
+            border: 2px solid #555;
+            border-radius: 10px;
+            cursor: pointer;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+
+<div id="ui">
+    <h1 id="stageText">STAGE: 1 / 10</h1>
+    <p id="scoreText">KILLS: 0</p>
+    <p id="healthText">TRENCH HP: 10</p>
+</div>
+
+<div id="startScreen" onclick="startGame()">
+    <h1>DEFEND THE TRENCH</h1>
+    <p>조작: 마우스 이동/클릭, 좌우 방향키/스페이스바, 화면 터치/드래그</p>
+    <h2 style="color: #ffaa00; margin-top: 20px;">[ 클릭하여 게임 시작 ]</h2>
+</div>
+
+<canvas id="gameCanvas"></canvas>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    let cw, ch;
+    let trenchY; 
+    
+    function resize() {
+        cw = canvas.width = window.innerWidth;
+        ch = canvas.height = window.innerHeight;
+        trenchY = ch - 120;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // --- 지정된 폴더의 이미지 로드 (Youmi001.jpg ~ Youmi044.jpg) ---
+    const enemyImages = [];
+    for (let i = 1; i <= 44; i++) {
+        const img = new Image();
+        // 1을 '001', 44를 '044' 형태로 포맷팅
+        const numStr = i.toString().padStart(3, '0');
+        img.src = `YoomiImage/Youmi${numStr}.jpg`;
+        enemyImages.push(img);
+    }
+
+    // --- 웹 오디오 API (기관총 소리 자체 합성) ---
+    let audioCtx;
+    let noiseBuffer;
+
+    function initAudio() {
+        if (audioCtx) return;
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        const bufferSize = audioCtx.sampleRate * 0.2;
+        noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            output[i] = Math.random() * 2 - 1;
+        }
+    }
+
+    function playGunSound() {
+        if (!audioCtx) return;
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        
+        const time = audioCtx.currentTime;
+        
+        const noiseSource = audioCtx.createBufferSource();
+        noiseSource.buffer = noiseBuffer;
+        
+        const noiseFilter = audioCtx.createBiquadFilter();
+        noiseFilter.type = 'lowpass';
+        noiseFilter.frequency.setValueAtTime(4000, time);
+        noiseFilter.frequency.exponentialRampToValueAtTime(500, time + 0.15);
+        
+        const noiseGain = audioCtx.createGain();
+        noiseGain.gain.setValueAtTime(1.2, time);
+        noiseGain.gain.exponentialRampToValueAtTime(0.01, time + 0.15);
+        
+        noiseSource.connect(noiseFilter);
+        noiseFilter.connect(noiseGain);
+        noiseGain.connect(audioCtx.destination);
+        noiseSource.start(time);
+        
+        const osc = audioCtx.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(250, time);
+        osc.frequency.exponentialRampToValueAtTime(30, time + 0.1);
+        
+        const oscGain = audioCtx.createGain();
+        oscGain.gain.setValueAtTime(1.5, time);
+        oscGain.gain.exponentialRampToValueAtTime(0.01, time + 0.1);
+        
+        osc.connect(oscGain);
+        oscGain.connect(audioCtx.destination);
+        osc.start(time);
+        osc.stop(time + 0.15);
+    }
+
+    // --- 게임 상태 변수 ---
+    let isPlaying = false;
+    let stage = 1;
+    let kills = 0;
+    let killsToNextStage = 10;
+    let hp = 10;
+    
+    let gunAngle = -Math.PI / 2;
+    let isFiring = false;
+    let lastFireTime = 0;
+    const fireRate = 80;
+    
+    let bullets = [];
+    let enemies = [];
+    let frameCount = 0;
+
+    const keys = { left: false, right: false };
+
+    // --- 입력 처리 ---
+    window.addEventListener('keydown', (e) => {
+        if (e.code === 'ArrowLeft') keys.left = true;
+        if (e.code === 'ArrowRight') keys.right = true;
+        if (e.code === 'Space') {
+            if (!isFiring) isFiring = true;
+        }
+    });
+    window.addEventListener('keyup', (e) => {
+        if (e.code === 'ArrowLeft') keys.left = false;
+        if (e.code === 'ArrowRight') keys.right = false;
+        if (e.code === 'Space') isFiring = false;
+    });
+
+    window.addEventListener('mousemove', (e) => {
+        updateAngle(e.clientX, e.clientY);
+    });
+    window.addEventListener('mousedown', () => isFiring = true);
+    window.addEventListener('mouseup', () => isFiring = false);
+
+    window.addEventListener('touchstart', (e) => {
+        isFiring = true;
+        updateAngle(e.touches[0].clientX, e.touches[0].clientY);
+    }, {passive: false});
+    window.addEventListener('touchmove', (e) => {
+        updateAngle(e.touches[0].clientX, e.touches[0].clientY);
+    }, {passive: false});
+    window.addEventListener('touchend', () => isFiring = false);
+
+    function updateAngle(x, y) {
+        const dx = x - cw / 2;
+        const dy = y - (trenchY + 20); 
+        gunAngle = Math.atan2(dy, dx);
+        if (gunAngle > -0.2) gunAngle = -0.2;
+        if (gunAngle < -Math.PI + 0.2) gunAngle = -Math.PI + 0.2;
+    }
+
+    // --- 객체 드로잉 ---
+    function drawStickman(x, y, scale, imgIndex) {
+        ctx.strokeStyle = '#ff3333';
+        ctx.lineWidth = 2 * scale;
+        
+        // 머리 부분 크기 설정 (사진이 보이도록 기존보다 약간 키움)
+        const headRadius = 13 * scale;
+        const headY = y - 40 * scale;
+
+        // 1. 머리 (이미지를 원형으로 잘라서 렌더링)
+        const img = enemyImages[imgIndex];
+        if (img && img.complete) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(x, headY, headRadius, 0, Math.PI * 2);
+            ctx.clip(); // 원형으로 자르기
+            ctx.drawImage(img, x - headRadius, headY - headRadius, headRadius * 2, headRadius * 2);
+            ctx.restore();
+            
+            // 머리 테두리
+            ctx.beginPath();
+            ctx.arc(x, headY, headRadius, 0, Math.PI * 2);
+            ctx.stroke();
+        } else {
+            // 이미지가 아직 로드되지 않은 경우 기본 원
+            ctx.beginPath();
+            ctx.arc(x, headY, headRadius, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+
+        // 2. 몸통, 팔, 다리 그리기
+        ctx.beginPath();
+        ctx.moveTo(x, headY + headRadius); // 머리 바로 아래에서 몸통 시작
+        ctx.lineTo(x, y - 10 * scale); 
+        ctx.moveTo(x - 15 * scale, y - 25 * scale);
+        ctx.lineTo(x + 15 * scale, y - 25 * scale); 
+        ctx.moveTo(x, y - 10 * scale);
+        ctx.lineTo(x - 10 * scale, y); 
+        ctx.moveTo(x, y - 10 * scale);
+        ctx.lineTo(x + 10 * scale, y); 
+        ctx.stroke();
+    }
+
+    function drawGun() {
+        ctx.save();
+        ctx.translate(cw / 2, trenchY + 20);
+        ctx.rotate(gunAngle);
+        
+        let recoil = 0;
+        if (isFiring) recoil = -5 + Math.random() * 2;
+        
+        ctx.translate(recoil, 0);
+
+        ctx.fillStyle = '#2b2b2b';
+        ctx.fillRect(0, -12, 130, 24);
+        
+        ctx.fillStyle = '#111';
+        for(let i=20; i<110; i+=12) {
+            ctx.fillRect(i, -10, 5, 20);
+        }
+
+        if (isFiring) {
+            ctx.fillStyle = 'rgba(255, 180, 0, 0.9)';
+            ctx.beginPath();
+            ctx.moveTo(130, -10);
+            ctx.lineTo(180 + Math.random() * 60, 0);
+            ctx.lineTo(130, 10);
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+
+    function drawTrench() {
+        ctx.fillStyle = '#2b2116';
+        ctx.fillRect(0, trenchY, cw, ch - trenchY);
+        
+        ctx.fillStyle = '#6e6146';
+        ctx.strokeStyle = '#1c1811';
+        ctx.lineWidth = 2;
+        
+        const bagW = 100;
+        const bagH = 40;
+        
+        for (let row = 0; row < 3; row++) {
+            let yPos = trenchY - 15 + (row * 22);
+            let offset = row % 2 === 0 ? 0 : -(bagW / 2);
+            
+            for (let x = offset; x < cw + bagW; x += bagW) {
+                ctx.beginPath();
+                ctx.moveTo(x + 10, yPos);
+                ctx.lineTo(x + bagW - 15, yPos);
+                ctx.quadraticCurveTo(x + bagW - 5, yPos, x + bagW - 5, yPos + 10);
+                ctx.lineTo(x + bagW - 5, yPos + bagH - 10);
+                ctx.quadraticCurveTo(x + bagW - 5, yPos + bagH, x + bagW - 15, yPos + bagH);
+                ctx.lineTo(x + 10, yPos + bagH);
+                ctx.quadraticCurveTo(x, yPos + bagH, x, yPos + bagH - 10);
+                ctx.lineTo(x, yPos + 10);
+                ctx.quadraticCurveTo(x, yPos, x + 10, yPos);
+                ctx.fill();
+                ctx.stroke();
+            }
+        }
+    }
+
+    // --- 게임 루프 ---
+    function startGame() {
+        // 전체 화면 모드 진입 코드 제거됨
+        document.getElementById('startScreen').style.display = 'none';
+        
+        initAudio(); 
+        resize();
+
+        isPlaying = true;
+        stage = 1;
+        kills = 0;
+        hp = 10;
+        killsToNextStage = 10;
+        bullets = [];
+        enemies = [];
+        updateUI();
+        gameLoop();
+    }
+
+    function updateUI() {
+        document.getElementById('stageText').innerText = `STAGE: ${stage} / 10`;
+        document.getElementById('scoreText').innerText = `KILLS: ${kills} (Next: ${killsToNextStage})`;
+        document.getElementById('healthText').innerText = `TRENCH HP: ${hp}`;
+    }
+
+    function spawnEnemy() {
+        const xPos = (Math.random() * cw * 0.9) + (cw * 0.05);
+        enemies.push({
+            x: xPos,
+            y: ch * 0.20,
+            baseX: xPos,
+            speed: 0.5 + (stage * 0.25),
+            wobble: Math.random() * Math.PI * 2,
+            imgIndex: Math.floor(Math.random() * 44) // 0~43 무작위 인덱스 부여
+        });
+    }
+
+    function gameLoop(timestamp) {
+        if (!isPlaying) return;
+        requestAnimationFrame(gameLoop);
+
+        ctx.clearRect(0, 0, cw, ch);
+        frameCount++;
+
+        if (keys.left) gunAngle -= 0.04;
+        if (keys.right) gunAngle += 0.04;
+        if (gunAngle > -0.2) gunAngle = -0.2;
+        if (gunAngle < -Math.PI + 0.2) gunAngle = -Math.PI + 0.2;
+
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillRect(0, ch * 0.20, cw, ch * 0.80);
+        ctx.strokeStyle = '#333';
+        ctx.beginPath();
+        ctx.moveTo(0, ch * 0.20);
+        ctx.lineTo(cw, ch * 0.20);
+        ctx.stroke();
+
+        if (isFiring && timestamp - lastFireTime > fireRate) {
+            playGunSound();
+            bullets.push({
+                x: cw / 2 + Math.cos(gunAngle) * 130,
+                y: trenchY + 20 + Math.sin(gunAngle) * 130,
+                vx: Math.cos(gunAngle) * 25,
+                vy: Math.sin(gunAngle) * 25
+            });
+            lastFireTime = timestamp;
+        }
+
+        for (let i = bullets.length - 1; i >= 0; i--) {
+            let b = bullets[i];
+            b.x += b.vx;
+            b.y += b.vy;
+            
+            ctx.fillStyle = '#ffcc00';
+            ctx.beginPath();
+            ctx.arc(b.x, b.y, 4, 0, Math.PI * 2);
+            ctx.fill();
+
+            if (b.x < 0 || b.x > cw || b.y < 0 || b.y > ch) {
+                bullets.splice(i, 1);
+            }
+        }
+
+        const spawnInterval = Math.max(10, 90 - (stage * 8));
+        if (frameCount % spawnInterval === 0) spawnEnemy();
+
+        for (let i = enemies.length - 1; i >= 0; i--) {
+            let e = enemies[i];
+            
+            let distanceProgress = (e.y - ch * 0.20) / (trenchY - ch * 0.20);
+            let scale = 0.15 + (distanceProgress * 3.5); 
+            
+            e.y += e.speed * scale;
+            e.wobble += 0.1;
+            e.x = e.baseX + Math.sin(e.wobble) * 25 * scale;
+
+            // 추가된 이미지 인덱스 파라미터 전달
+            drawStickman(e.x, e.y, scale, e.imgIndex);
+
+            let hit = false;
+            let hitRadius = 25 * scale;
+            for (let j = bullets.length - 1; j >= 0; j--) {
+                let b = bullets[j];
+                let dist = Math.hypot(b.x - e.x, b.y - (e.y - 20 * scale));
+                if (dist < hitRadius) {
+                    hit = true;
+                    bullets.splice(j, 1);
+                    break;
+                }
+            }
+
+            if (hit) {
+                enemies.splice(i, 1);
+                kills++;
+                if (kills >= killsToNextStage) {
+                    stage++;
+                    if (stage > 10) {
+                        alert("승리! 방어선을 완벽하게 지켜냈습니다!");
+                        isPlaying = false;
+                        document.getElementById('startScreen').style.display = 'block';
+                        return;
+                    }
+                    killsToNextStage += 10 + (stage * 5);
+                }
+                updateUI();
+                continue;
+            }
+
+            if (e.y >= trenchY) {
+                enemies.splice(i, 1);
+                hp--;
+                updateUI();
+                if (hp <= 0) {
+                    alert(`게임 오버! 도달한 스테이지: ${stage}`);
+                    isPlaying = false;
+                    document.getElementById('startScreen').style.display = 'block';
+                    return;
+                }
+            }
+        }
+
+        drawGun();
+        drawTrench();
+    }
+</script>
+</body>
+</html>
