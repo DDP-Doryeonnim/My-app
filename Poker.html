@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gallery Poker Pro - Authentic Stakes</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Noto+Sans+KR:wght@400;700;900&display=swap');
+
+        :root {
+            --suit-red: #ff2a2a;
+            --suit-black: #111111;
+            --gold: #d4af37;
+            --bg-color: #06150d;
+            --table-bg: radial-gradient(ellipse at center, #0f3622 0%, #06150d 100%);
+        }
+
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            background: var(--bg-color); font-family: 'Noto Sans KR', sans-serif;
+            color: #fff; overflow: hidden; display: flex; flex-direction: column;
+        }
+
+        /* --- Header --- */
+        header {
+            background: rgba(0, 0, 0, 0.9); border-bottom: 2px solid var(--gold);
+            padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; z-index: 100;
+        }
+
+        .title { font-family: 'Cinzel', serif; font-size: 22px; color: var(--gold); text-shadow: 0 0 10px rgba(212, 175, 55, 0.5); margin: 0; }
+        .top-settings select { background: #111; color: var(--gold); border: 1px solid var(--gold); padding: 5px 10px; border-radius: 5px; font-weight: bold; cursor: pointer; outline: none; }
+
+        /* --- Table & UI --- */
+        #game-board {
+            flex: 1; background: var(--table-bg); position: relative; display: flex; flex-direction: column; justify-content: space-between; align-items: center; padding: 10px 20px 20px 20px; box-shadow: inset 0 0 50px rgba(0,0,0,0.8);
+        }
+
+        .money-badge {
+            position: absolute; background: rgba(0,0,0,0.8); border: 1px solid var(--gold); color: #fff; padding: 8px 15px; border-radius: 8px; font-weight: bold; font-size: 14px; z-index: 10;
+        }
+        #dealer-money { top: 10px; right: 20px; }
+        #player-money { bottom: 180px; right: 20px; }
+
+        .pot-container {
+            position: absolute; top: 48%; left: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; z-index: 5; pointer-events: none;
+        }
+        .pot-badge {
+            background: radial-gradient(circle, #331100, #1a0000); border: 2px solid #ff4444; color: #ffcc00; padding: 10px 30px; border-radius: 30px; font-size: 22px; font-weight: 900; box-shadow: 0 0 20px rgba(255,0,0,0.5); text-align: center;
+        }
+        .bet-info { font-size: 13px; color: #aaa; margin-top: 5px; background: rgba(0,0,0,0.7); padding: 5px 15px; border-radius: 10px; }
+
+        .dealer-msg {
+            position: absolute; top: 140px; left: 50%; transform: translateX(-50%); background: rgba(255,255,255,0.9); color: #000; padding: 5px 15px; border-radius: 20px; font-weight: bold; font-size: 14px; opacity: 0; transition: opacity 0.3s; z-index: 20; box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        }
+        .dealer-msg::after { content:''; position:absolute; bottom:-8px; left:50%; transform:translateX(-50%); border-width: 8px 8px 0; border-style: solid; border-color: rgba(255,255,255,0.9) transparent transparent transparent; }
+
+        .area { width: 100%; display: flex; flex-direction: column; align-items: center; min-height: 160px; }
+        .cards-container { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; min-height: 140px; }
+        .area-label { color: rgba(255,255,255,0.4); font-size: 12px; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 2px; }
+
+        /* --- Cards --- */
+        .card { width: 100px; height: 140px; perspective: 1000px; transition: transform 0.2s; cursor: default; position: relative; }
+        .card.selectable { cursor: pointer; }
+        .card.selectable:hover { transform: translateY(-10px); }
+        .card.selected { transform: translateY(-20px); box-shadow: 0 0 20px var(--gold); border-radius: 8px; border: 2px solid var(--gold); }
+
+        .card-inner { width: 100%; height: 100%; position: relative; transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1); transform-style: preserve-3d; }
+        .card.face-up .card-inner { transform: rotateY(180deg); }
+
+        .card-front, .card-back { width: 100%; height: 100%; position: absolute; backface-visibility: hidden; border-radius: 8px; box-shadow: 2px 2px 10px rgba(0,0,0,0.6); border: 2px solid #fff; overflow: hidden; background-color: #fff; }
+        .card-back { background: repeating-linear-gradient(45deg, #0f0f0f, #0f0f0f 10px, #1a1a1a 10px, #1a1a1a 20px); border-color: #333; display: flex; justify-content: center; align-items: center; }
+        .card-back::after { content: "✦"; font-size: 40px; color: #444; }
+        .card-front { transform: rotateY(180deg); background-size: cover; background-position: center; }
+
+        .card-corner { position: absolute; background: rgba(255, 255, 255, 0.9); padding: 2px 4px; border-radius: 4px; text-align: center; font-weight: 900; font-size: 14px; line-height: 1.1; box-shadow: 0 1px 3px rgba(0,0,0,0.4); backdrop-filter: blur(2px); }
+        .corner-top { top: 4px; left: 4px; }
+        .corner-bottom { bottom: 4px; right: 4px; transform: rotate(180deg); }
+        .suit-red { color: var(--suit-red); } .suit-black { color: var(--suit-black); }
+
+        .card.hole-card::after {
+            content: "🔒 HIDDEN"; position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.85); color: #10b981; padding: 4px 8px; font-size: 11px; font-weight: bold;
+            border-radius: 4px; border: 1px solid #10b981; pointer-events: none; white-space: nowrap; z-index: 10;
+        }
+        .card.hole-card .card-front { filter: brightness(0.85); }
+
+        /* --- Action Panel --- */
+        .action-panel { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: auto; z-index: 50; width: 100%; max-width: 600px; }
+        .instruction { color: var(--gold); font-size: 16px; font-weight: bold; text-shadow: 0 0 5px rgba(0,0,0,1); text-align: center; height: 20px; }
+        .betting-buttons { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; width: 100%; }
+
+        .action-btn { background: linear-gradient(to bottom, #d4af37, #997a00); color: #111; border: 2px solid #fff; padding: 12px 20px; border-radius: 8px; font-family: 'Noto Sans KR', sans-serif; font-size: 15px; font-weight: 900; cursor: pointer; box-shadow: 0 4px 10px rgba(212, 175, 55, 0.4); transition: transform 0.1s; flex: 1; min-width: 80px; max-width: 150px; }
+        .action-btn:active { transform: scale(0.95); }
+        .action-btn.call { background: linear-gradient(to bottom, #3b82f6, #1d4ed8); color: #fff; max-width: 250px;}
+        .action-btn.all-in { background: linear-gradient(to bottom, #ff2a2a, #aa0000); color: #fff; }
+        .action-btn.fold { background: linear-gradient(to bottom, #555, #222); color: #fff; }
+        .action-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        #btn-deal { padding: 15px 50px; font-size: 20px; border-radius: 30px; max-width: 300px; }
+
+        /* --- Modals --- */
+        .modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0, 0, 0, 0.95); border: 2px solid var(--gold); padding: 30px 40px; border-radius: 15px; text-align: center; z-index: 200; display: none; box-shadow: 0 0 50px rgba(212, 175, 55, 0.5); width: 80%; max-width: 400px; }
+        .modal-title { font-size: 28px; color: var(--gold); margin-bottom: 10px; font-weight: 900; font-family: 'Cinzel', serif; }
+        .modal-desc { font-size: 16px; color: #fff; margin-bottom: 25px; line-height: 1.5; }
+        .modal-btn { background: #333; color: #fff; border: 1px solid var(--gold); padding: 12px 30px; font-size: 16px; font-weight: bold; cursor: pointer; border-radius: 5px; width: 100%; transition: background 0.2s; }
+        .modal-btn:hover { background: var(--gold); color: #000; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .card { width: 70px; height: 100px; }
+            .card-corner { font-size: 12px; padding: 2px; }
+            #dealer-money, #player-money { font-size: 12px; padding: 5px 10px; }
+            .pot-badge { font-size: 18px; padding: 8px 20px; }
+            .action-btn { font-size: 13px; padding: 10px 5px; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="title">GALLERY POKER PRO</div>
+        <div class="top-settings">
+            <select id="game-mode">
+                <option value="holdem">Texas Hold'em</option>
+                <option value="draw">5 Card Draw</option>
+                <option value="stud" selected>7 Card Stud (세븐포커)</option>
+            </select>
+        </div>
+    </header>
+
+    <div id="game-board">
+        <div id="dealer-money" class="money-badge">Dealer: 1,000,000</div>
+        <div class="dealer-msg" id="dealer-message">딜러 생각중...</div>
+
+        <div class="pot-container">
+            <div id="pot-display" class="pot-badge">POT: 0</div>
+            <div id="bet-info" class="bet-info">Player Bet: 0 | Dealer Bet: 0</div>
+        </div>
+        
+        <div id="player-money" class="money-badge">Player: 1,000,000</div>
+
+        <div class="area" id="area-dealer">
+            <div class="area-label">Dealer</div>
+            <div class="cards-container" id="dealer-cards"></div>
+        </div>
+
+        <div class="area" id="area-community">
+            <div class="area-label" id="community-label">Community</div>
+            <div class="cards-container" id="community-cards"></div>
+        </div>
+
+        <div class="action-panel">
+            <div class="instruction" id="instruction-text">게임을 선택하고 DEAL을 누르세요.</div>
+            <button id="btn-deal" class="action-btn">DEAL (앤티 1만)</button>
+            
+            <div class="betting-buttons" id="bet-controls" style="display:none;">
+                <button class="action-btn" id="btn-check-call" onclick="playerAct('check_call')">CHECK</button>
+                <button class="action-btn" id="btn-bet-1" onclick="playerAct('raise', 10000)">+ 1만</button>
+                <button class="action-btn" id="btn-bet-5" onclick="playerAct('raise', 50000)">+ 5만</button>
+                <button class="action-btn" id="btn-pot" onclick="playerAct('raise', 'pot')">POT</button>
+                <button class="action-btn fold" onclick="playerAct('fold')">FOLD</button>
+            </div>
+
+            <div class="betting-buttons" id="extra-controls" style="display:none;"></div>
+        </div>
+
+        <div class="area" id="area-player">
+            <div class="area-label">Player</div>
+            <div class="cards-container" id="player-cards"></div>
+        </div>
+
+        <div class="modal" id="result-modal">
+            <div class="modal-title" id="modal-title">WINNER</div>
+            <div class="modal-desc" id="modal-desc">Player wins with Pair</div>
+            <button class="modal-btn" id="btn-next-hand">NEXT HAND</button>
+        </div>
+
+        <div class="modal" id="gameover-modal">
+            <div class="modal-title" id="go-title" style="color: #ff2a2a;">GAME OVER</div>
+            <div class="modal-desc" id="go-desc">파산하셨습니다.</div>
+            <button class="modal-btn" onclick="location.reload()">RESTART GAME</button>
+        </div>
+    </div>
+
+    <script>
+        // --- 사운드 매니저 (Web Audio API) ---
+        let audioCtx;
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        const Sound = {
+            playChip() {
+                if(!audioCtx) return;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(2500, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1000, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+                
+                // 두 번째 짤그랑
+                setTimeout(() => {
+                    const osc2 = audioCtx.createOscillator(); const gain2 = audioCtx.createGain();
+                    osc2.connect(gain2); gain2.connect(audioCtx.destination);
+                    osc2.type = 'triangle'; osc2.frequency.setValueAtTime(3000, audioCtx.currentTime);
+                    gain2.gain.setValueAtTime(0.05, audioCtx.currentTime); gain2.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
+                    osc2.start(); osc2.stop(audioCtx.currentTime + 0.05);
+                }, 50);
+            },
+            playCard() {
+                if(!audioCtx) return;
+                const bufferSize = audioCtx.sampleRate * 0.1; // 0.1초
+                const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1; // 화이트 노이즈
+                
+                const noise = audioCtx.createBufferSource();
+                noise.buffer = buffer;
+                const gain = audioCtx.createGain();
+                const filter = audioCtx.createBiquadFilter();
+                
+                filter.type = 'bandpass'; filter.frequency.value = 1000;
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                
+                noise.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+                noise.start();
+            },
+            playFold() {
+                if(!audioCtx) return;
+                const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+            },
+            playWin() {
+                if(!audioCtx) return;
+                [440, 554, 659, 880].forEach((freq, i) => { // A메이저 코드 아르페지오
+                    setTimeout(() => {
+                        const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+                        osc.connect(gain); gain.connect(audioCtx.destination);
+                        osc.type = 'sine'; osc.frequency.value = freq;
+                        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+                        osc.start(); osc.stop(audioCtx.currentTime + 0.5);
+                    }, i * 150);
+                });
+            },
+            playLose() {
+                if(!audioCtx) return;
+                [300, 280, 260].forEach((freq, i) => { 
+                    setTimeout(() => {
+                        const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+                        osc.connect(gain); gain.connect(audioCtx.destination);
+                        osc.type = 'sawtooth'; osc.frequency.value = freq;
+                        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+                        osc.start(); osc.stop(audioCtx.currentTime + 0.4);
+                    }, i * 300);
+                });
+            }
+        };
+
+        // --- Game Data & Engine ---
+        const SUITS = [{ symbol: '♠', color: 'suit-black' }, { symbol: '♥', color: 'suit-red' }, { symbol: '♦', color: 'suit-red' }, { symbol: '♣', color: 'suit-black' }];
+        const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+        
+        let deck = [];
+        let pMoney = 1000000, dMoney = 1000000;
+        let pot = 0, currentMaxBet = 0, pCurrentBet = 0, dCurrentBet = 0;
+        const ANTE = 10000;
+
+        let state = {
+            mode: 'stud', phase: 0,
+            dealer: [], player: [], community: [],
+            isAllIn: false, isPlayerTurn: true
+        };
+
+        // --- DOM Elements ---
+        const ui = {
+            btnDeal: document.getElementById('btn-deal'),
+            betControls: document.getElementById('bet-controls'),
+            extraControls: document.getElementById('extra-controls'),
+            btnCheckCall: document.getElementById('btn-check-call'),
+            modeSelect: document.getElementById('game-mode'),
+            dCards: document.getElementById('dealer-cards'),
+            pCards: document.getElementById('player-cards'),
+            cCards: document.getElementById('community-cards'),
+            instruction: document.getElementById('instruction-text'),
+            pMoney: document.getElementById('player-money'),
+            dMoney: document.getElementById('dealer-money'),
+            pot: document.getElementById('pot-display'),
+            betInfo: document.getElementById('bet-info'),
+            dealerMsg: document.getElementById('dealer-message'),
+            cLabel: document.getElementById('community-label')
+        };
+
+        function formatMoney(n) { return n.toLocaleString() + ' 원'; }
+        function showDealerMsg(msg, duration = 2000) {
+            ui.dealerMsg.innerText = msg; ui.dealerMsg.style.opacity = 1;
+            if(duration > 0) setTimeout(() => ui.dealerMsg.style.opacity = 0, duration);
+        }
+        function updateUI() {
+            ui.pMoney.innerText = `Player: ${formatMoney(pMoney)}`;
+            ui.dMoney.innerText = `Dealer: ${formatMoney(dMoney)}`;
+            ui.pot.innerText = `POT: ${formatMoney(pot)}`;
+            ui.betInfo.innerText = `Player Bet: ${formatMoney(pCurrentBet)} | Dealer Bet: ${formatMoney(dCurrentBet)}`;
+        }
+
+        // --- Cards ---
+        function initDeck() {
+            deck = []; let imgIndex = 1;
+            for (let s of SUITS) {
+                for (let i = 0; i < RANKS.length; i++) {
+                    let imgStr = String(imgIndex).padStart(3, '0');
+                    if(imgIndex <= 52) deck.push({ suit: s.symbol, color: s.color, rank: RANKS[i], value: i + 2, imgPath: `YoomiImage/Youmi${imgStr}.jpg` });
+                    imgIndex++;
+                }
+            }
+        }
+        function shuffle() { for (let i = deck.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [deck[i], deck[j]] = [deck[j], deck[i]]; } }
+        function drawCard() { return deck.pop(); }
+
+        function createCardElement(card, faceUp = false, selectable = false) {
+            const el = document.createElement('div');
+            el.className = `card ${faceUp ? 'face-up' : ''} ${selectable ? 'selectable' : ''}`;
+            el.cardData = card;
+            el.innerHTML = `<div class="card-inner"><div class="card-back"></div><div class="card-front" style="background-image: url('${card.imgPath}')"><div class="card-corner corner-top ${card.color}"><div>${card.rank}</div><div>${card.suit}</div></div><div class="card-corner corner-bottom ${card.color}"><div>${card.rank}</div><div>${card.suit}</div></div></div></div>`;
+            
+            el.addEventListener('click', function() {
+                if (this.classList.contains('selectable')) {
+                    this.classList.toggle('selected');
+                    initAudio(); Sound.playCard(); // 선택 효과음
+                }
+            });
+            return el;
+        }
+
+        function renderHand(container, cards, faceUpArr, selectable = false) {
+            container.innerHTML = '';
+            cards.forEach((c, i) => container.appendChild(createCardElement(c, faceUpArr[i], selectable)));
+        }
+
+        // --- Core Game Flow ---
+        ui.btnDeal.addEventListener('click', () => { initAudio(); startHand(); });
+
+        function startHand() {
+            if (pMoney <= 0 || dMoney <= 0) return checkBankrupt();
+            Sound.playCard(); // 카드 딜링 소리
+            
+            initDeck(); shuffle();
+            state.mode = ui.modeSelect.value;
+            state.isAllIn = false;
+            
+            let actualAnte = Math.min(ANTE, pMoney, dMoney);
+            pMoney -= actualAnte; dMoney -= actualAnte; pot = actualAnte * 2;
+            updateUI();
+
+            ui.btnDeal.style.display = 'none';
+
+            if (state.mode === 'holdem') {
+                ui.cLabel.innerText = "Community";
+                state.dealer = [drawCard(), drawCard()];
+                state.player = [drawCard(), drawCard()];
+                state.community = [drawCard(), drawCard(), drawCard(), drawCard(), drawCard()];
+
+                renderHand(ui.dCards, state.dealer, [false, false]);
+                renderHand(ui.pCards, state.player, [true, true]);
+                ui.cCards.innerHTML = '';
+                state.community.forEach(c => { let el = createCardElement(c, false); el.style.display = 'none'; ui.cCards.appendChild(el); });
+
+                state.phase = 1; 
+                startBettingRound("프리플랍(Pre-Flop): 배팅하세요.");
+            } 
+            else if (state.mode === 'draw') {
+                ui.cLabel.innerText = "";
+                state.dealer = [drawCard(), drawCard(), drawCard(), drawCard(), drawCard()];
+                state.player = [drawCard(), drawCard(), drawCard(), drawCard(), drawCard()];
+
+                renderHand(ui.dCards, state.dealer, [false, false, false, false, false]);
+                renderHand(ui.pCards, state.player, [true, true, true, true, true]);
+                ui.cCards.innerHTML = '';
+
+                state.phase = 1; 
+                startBettingRound("카드를 받았습니다. 배팅하세요.");
+            }
+            else if (state.mode === 'stud') {
+                ui.cLabel.innerText = "7 Card Stud (세븐포커)";
+                state.dealer = [drawCard(), drawCard(), drawCard()];
+                state.player = [drawCard(), drawCard(), drawCard()];
+                ui.cCards.innerHTML = '';
+
+                renderHand(ui.dCards, state.dealer, [false, false, false], false);
+                renderHand(ui.pCards, state.player, [true, true, true], true);
+
+                state.phase = 0.5; 
+                ui.instruction.innerText = "상대에게 오픈(액면)할 카드를 1장만 선택하세요.";
+                ui.betControls.style.display = 'none';
+                ui.extraControls.style.display = 'flex';
+                ui.extraControls.innerHTML = '<button class="action-btn call" onclick="confirmStudOpen()">오픈 카드 1장 결정</button>';
+            }
+        }
+
+        function startBettingRound(msg) {
+            if(state.isAllIn) return progressPhase(); 
+            pCurrentBet = 0; dCurrentBet = 0; currentMaxBet = 0;
+            ui.instruction.innerText = msg;
+            ui.betControls.style.display = 'flex';
+            ui.extraControls.style.display = 'none';
+            setupPlayerOptions();
+            updateUI();
+        }
+
+        function setupPlayerOptions() {
+            state.isPlayerTurn = true;
+            ui.betControls.style.pointerEvents = 'auto';
+            let toCall = currentMaxBet - pCurrentBet;
+            
+            if (toCall === 0) { ui.btnCheckCall.innerText = "CHECK"; ui.btnCheckCall.className = "action-btn"; } 
+            else { ui.btnCheckCall.innerText = `CALL (${formatMoney(toCall)})`; ui.btnCheckCall.className = "action-btn call"; }
+
+            document.getElementById('btn-bet-1').disabled = pMoney <= toCall;
+            document.getElementById('btn-bet-5').disabled = pMoney <= toCall;
+            document.getElementById('btn-pot').disabled = pMoney <= toCall;
+        }
+
+        window.playerAct = function(action, amountStr) {
+            initAudio();
+            if(!state.isPlayerTurn) return;
+            ui.betControls.style.pointerEvents = 'none';
+            
+            if (action === 'fold') {
+                Sound.playFold(); // 폴드 사운드
+                dMoney += pot; pot = 0; updateUI();
+                ui.instruction.innerText = "폴드했습니다. 딜러가 승리합니다.";
+                ui.betControls.style.display = 'none';
+                setTimeout(() => { document.getElementById('btn-next-hand').click(); }, 1500);
+                return;
+            }
+
+            let toCall = currentMaxBet - pCurrentBet;
+
+            if (action === 'check_call') {
+                if (toCall > 0) {
+                    Sound.playChip(); // 콜 배팅 사운드
+                    let actualCall = Math.min(toCall, pMoney);
+                    pMoney -= actualCall; pCurrentBet += actualCall; pot += actualCall;
+                } else { Sound.playCard(); } // 체크 사운드 (카드 탭하는 느낌)
+            } 
+            else if (action === 'raise') {
+                Sound.playChip(); // 레이즈 칩 사운드
+                let raiseAmt = amountStr === 'pot' ? pot : parseInt(amountStr);
+                let totalBetNeeded = toCall + raiseAmt;
+                let actualBet = Math.min(totalBetNeeded, pMoney);
+                
+                pMoney -= actualBet; pCurrentBet += actualBet; pot += actualBet;
+                currentMaxBet = pCurrentBet;
+            }
+
+            updateUI();
+            
+            if (pMoney === 0) { state.isAllIn = true; showDealerMsg("플레이어 ALL-IN!"); }
+            state.isPlayerTurn = false;
+            setTimeout(dealerAct, 800); 
+        };
+
+        function dealerAct() {
+            let toCall = currentMaxBet - dCurrentBet;
+            if (toCall === 0) {
+                let rnd = Math.random();
+                if (rnd < 0.2 && dMoney > 0 && !state.isAllIn) {
+                    Sound.playChip();
+                    let betAmt = Math.min(10000, dMoney);
+                    dMoney -= betAmt; dCurrentBet += betAmt; pot += betAmt; currentMaxBet = dCurrentBet;
+                    showDealerMsg(`딜러가 ${formatMoney(betAmt)} 배팅합니다!`);
+                    updateUI(); setTimeout(setupPlayerOptions, 1000);
+                } else {
+                    Sound.playCard();
+                    showDealerMsg("딜러가 CHECK 합니다.");
+                    setTimeout(progressPhase, 1000);
+                }
+            } 
+            else {
+                let rnd = Math.random();
+                if (rnd < 0.15 && toCall > 20000 && !state.isAllIn) {
+                    Sound.playFold();
+                    showDealerMsg("딜러가 FOLD 했습니다!");
+                    pMoney += pot; pot = 0; updateUI();
+                    ui.betControls.style.display = 'none';
+                    setTimeout(() => { document.getElementById('btn-next-hand').click(); }, 1500);
+                } else {
+                    Sound.playChip();
+                    let actualCall = Math.min(toCall, dMoney);
+                    dMoney -= actualCall; dCurrentBet += actualCall; pot += actualCall;
+                    showDealerMsg(`딜러가 CALL 했습니다.`);
+                    if(dMoney === 0) state.isAllIn = true;
+                    updateUI(); setTimeout(progressPhase, 1200);
+                }
+            }
+        }
+
+        function progressPhase() {
+            ui.betControls.style.display = 'none';
+            if(state.isGameOver) return;
+
+            if (state.mode === 'holdem') {
+                const commDivs = ui.cCards.children;
+                if (state.phase === 1) { 
+                    Sound.playCard();
+                    for(let i=0; i<3; i++) { commDivs[i].style.display = 'block'; setTimeout(() => commDivs[i].classList.add('face-up'), 50); }
+                    state.phase = 2; setTimeout(() => startBettingRound("플랍(Flop): 배팅하세요."), 800);
+                } else if (state.phase === 2) { 
+                    Sound.playCard();
+                    commDivs[3].style.display = 'block'; setTimeout(() => commDivs[3].classList.add('face-up'), 50);
+                    state.phase = 3; setTimeout(() => startBettingRound("턴(Turn): 배팅하세요."), 800);
+                } else if (state.phase === 3) { 
+                    Sound.playCard();
+                    commDivs[4].style.display = 'block'; setTimeout(() => commDivs[4].classList.add('face-up'), 50);
+                    state.phase = 4; setTimeout(() => startBettingRound("리버(River): 마지막 배팅!"), 800);
+                } else if (state.phase === 4) { 
+                    Sound.playCard();
+                    Array.from(ui.dCards.children).forEach(el => el.classList.add('face-up'));
+                    setTimeout(() => evaluateGame(state.player.concat(state.community), state.dealer.concat(state.community)), 1000);
+                }
+            } 
+            else if (state.mode === 'draw') {
+                if (state.phase === 1) {
+                    ui.instruction.innerText = "클릭하여 바꿀 카드를 선택하세요 (최대 5장).";
+                    Array.from(ui.pCards.children).forEach(el => el.classList.add('selectable'));
+                    ui.extraControls.style.display = 'flex';
+                    ui.extraControls.innerHTML = '<button class="action-btn call" onclick="confirmDraw()">선택한 카드 교환 (DRAW)</button>';
+                } else if (state.phase === 2) { 
+                    Sound.playCard();
+                    Array.from(ui.dCards.children).forEach(el => el.classList.add('face-up'));
+                    setTimeout(() => evaluateGame(state.player, state.dealer), 1000);
+                }
+            }
+            else if (state.mode === 'stud') {
+                if (state.phase >= 1 && state.phase <= 3) { 
+                    Sound.playCard();
+                    const pC = drawCard(), dC = drawCard();
+                    state.player.push(pC); state.dealer.push(dC);
+                    ui.pCards.appendChild(createCardElement(pC, true)); ui.dCards.appendChild(createCardElement(dC, true));
+                    state.phase++;
+                    const texts = ["4구(4th)", "5구(5th)", "6구(6th)"];
+                    setTimeout(() => startBettingRound(`${texts[state.phase - 2]}: 배팅하세요.`), 800);
+                } else if (state.phase === 4) { 
+                    Sound.playCard();
+                    const pC = drawCard(), dC = drawCard();
+                    state.player.push(pC); state.dealer.push(dC);
+                    let p7Card = createCardElement(pC, true); p7Card.classList.add('hole-card');
+                    ui.pCards.appendChild(p7Card); ui.dCards.appendChild(createCardElement(dC, false));
+                    state.phase++; setTimeout(() => startBettingRound("히든(7th): 마지막 배팅!"), 800);
+                } else if (state.phase === 5) {
+                    Sound.playCard();
+                    Array.from(ui.pCards.children).forEach(el => el.classList.remove('hole-card'));
+                    Array.from(ui.dCards.children).forEach(el => el.classList.add('face-up'));
+                    setTimeout(() => evaluateGame(state.player, state.dealer), 1000);
+                }
+            }
+        }
+
+        window.confirmStudOpen = function() {
+            initAudio(); Sound.playCard();
+            const playerCardEls = Array.from(ui.pCards.children);
+            let selectedEls = playerCardEls.filter(el => el.classList.contains('selected'));
+            if (selectedEls.length !== 1) { alert("상대에게 오픈할 카드를 정확히 1장만 선택해주세요."); return; }
+
+            let selectedIdx = playerCardEls.indexOf(selectedEls[0]);
+            let pOpenCard = state.player.splice(selectedIdx, 1)[0]; state.player.push(pOpenCard);
+
+            let dOpenIdx = Math.floor(Math.random() * 3);
+            let dOpenCard = state.dealer.splice(dOpenIdx, 1)[0]; state.dealer.push(dOpenCard);
+
+            renderHand(ui.pCards, state.player, [true, true, true], false);
+            ui.pCards.children[0].classList.add('hole-card'); ui.pCards.children[1].classList.add('hole-card');
+            renderHand(ui.dCards, state.dealer, [false, false, true], false);
+
+            state.phase = 1; ui.extraControls.style.display = 'none';
+            startBettingRound("3구(3rd Street)가 오픈되었습니다. 배팅하세요.");
+        }
+
+        window.confirmDraw = function() {
+            initAudio(); Sound.playCard();
+            ui.extraControls.style.display = 'none';
+            const playerCardEls = Array.from(ui.pCards.children);
+            for (let i = 0; i < playerCardEls.length; i++) {
+                if (playerCardEls[i].classList.contains('selected')) {
+                    const newCard = drawCard(); state.player[i] = newCard;
+                    ui.pCards.replaceChild(createCardElement(newCard, true, false), playerCardEls[i]);
+                } else { playerCardEls[i].classList.remove('selectable'); }
+            }
+            
+            showDealerMsg("딜러가 카드를 교환합니다.");
+            setTimeout(() => {
+                Sound.playCard();
+                const swapCount = Math.floor(Math.random() * 4);
+                let indices = [0,1,2,3,4].sort(() => Math.random() - 0.5).slice(0, swapCount);
+                indices.forEach(idx => { state.dealer[idx] = drawCard(); });
+                renderHand(ui.dCards, state.dealer, [false,false,false,false,false]);
+                state.phase = 2; setTimeout(() => startBettingRound("마지막 배팅 라운드입니다."), 1000);
+            }, 1500);
+        }
+
+        // --- Evaluation ---
+        function getCombinations(arr, k) {
+            let result = [];
+            function combine(start, combo) {
+                if(combo.length === k) { result.push([...combo]); return; }
+                for(let i = start; i < arr.length; i++) { combo.push(arr[i]); combine(i + 1, combo); combo.pop(); }
+            }
+            combine(0, []); return result;
+        }
+
+        function evaluate5Cards(cards) {
+            let ranks = cards.map(c => c.value).sort((a, b) => b - a);
+            let suits = cards.map(c => c.suit);
+            let counts = {}; let suitCounts = {};
+            ranks.forEach(r => counts[r] = (counts[r] || 0) + 1);
+            suits.forEach(s => suitCounts[s] = (suitCounts[s] || 0) + 1);
+
+            let isFlush = Object.values(suitCounts).some(v => v >= 5);
+            let isStraight = false;
+            let uniqueRanks = [...new Set(ranks)];
+            for (let i = 0; i <= uniqueRanks.length - 5; i++) { if (uniqueRanks[i] - uniqueRanks[i+4] === 4) isStraight = true; }
+
+            let freqs = Object.entries(counts).map(([r, c]) => ({rank: parseInt(r), count: c})).sort((a,b) => b.count - a.count || b.rank - a.rank);
+            let score = 0, name = "High Card", tieBreaker = 0;
+
+            if (isStraight && isFlush) { score = 8; name = "Straight Flush"; tieBreaker = ranks[0]; }
+            else if (freqs[0].count === 4) { score = 7; name = "Four of a Kind"; tieBreaker = freqs[0].rank; }
+            else if (freqs[0].count === 3 && freqs[1] && freqs[1].count >= 2) { score = 6; name = "Full House"; tieBreaker = freqs[0].rank * 100 + freqs[1].rank; }
+            else if (isFlush) { score = 5; name = "Flush"; tieBreaker = ranks[0]; }
+            else if (isStraight) { score = 4; name = "Straight"; tieBreaker = uniqueRanks[0]; }
+            else if (freqs[0].count === 3) { score = 3; name = "Three of a Kind"; tieBreaker = freqs[0].rank; }
+            else if (freqs[0].count === 2 && freqs[1] && freqs[1].count === 2) { score = 2; name = "Two Pair"; tieBreaker = freqs[0].rank * 100 + freqs[1].rank; }
+            else if (freqs[0].count === 2) { score = 1; name = "Pair"; tieBreaker = freqs[0].rank; }
+            else { tieBreaker = ranks[0] * 1000 + ranks[1] * 100 + ranks[2] * 10 + ranks[3]; }
+
+            return { score, name, tieBreaker };
+        }
+
+        function getBestHand(cards) {
+            if(cards.length <= 5) return evaluate5Cards(cards);
+            let combos = getCombinations(cards, 5);
+            let best = combos[0]; let bestEval = evaluate5Cards(best);
+            for(let i=1; i<combos.length; i++){
+                let ev = evaluate5Cards(combos[i]);
+                if(ev.score > bestEval.score || (ev.score === bestEval.score && ev.tieBreaker > bestEval.tieBreaker)) {
+                    bestEval = ev; best = combos[i];
+                }
+            }
+            return bestEval;
+        }
+
+        function evaluateGame(pHand, dHand) {
+            ui.betControls.style.display = 'none';
+            let pRes = getBestHand(pHand); let dRes = getBestHand(dHand);
+            let title = "", desc = `Player: <span style="color:#d4af37">${pRes.name}</span><br>Dealer: <span style="color:#aaa">${dRes.name}</span>`;
+
+            if (pRes.score > dRes.score || (pRes.score === dRes.score && pRes.tieBreaker > dRes.tieBreaker)) { 
+                title = "YOU WIN!"; document.getElementById('modal-title').style.color = "#10b981"; pMoney += pot; Sound.playWin();
+            } else if (pRes.score < dRes.score || (pRes.score === dRes.score && pRes.tieBreaker < dRes.tieBreaker)) { 
+                title = "DEALER WINS"; document.getElementById('modal-title').style.color = "#ef4444"; dMoney += pot; Sound.playLose();
+            } else { 
+                title = "DRAW (Split)"; document.getElementById('modal-title').style.color = "#3b82f6"; pMoney += pot/2; dMoney += pot/2; 
+            }
+
+            pot = 0; updateUI();
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-desc').innerHTML = desc;
+            document.getElementById('result-modal').style.display = 'block';
+        }
+
+        function checkBankrupt() {
+            if (pMoney <= 0) {
+                document.getElementById('go-title').innerText = "GAME OVER";
+                document.getElementById('go-title').style.color = "#ef4444";
+                document.getElementById('gameover-modal').style.display = 'block';
+                Sound.playLose();
+            } else if (dMoney <= 0) {
+                document.getElementById('go-title').innerText = "VICTORY!";
+                document.getElementById('go-title').style.color = "#d4af37";
+                document.getElementById('go-desc').innerText = "카지노를 파산시켰습니다!";
+                document.getElementById('gameover-modal').style.display = 'block';
+                Sound.playWin();
+            } else {
+                ui.btnDeal.style.display = 'inline-block';
+                ui.instruction.innerText = "DEAL을 눌러 다음 핸드를 시작하세요.";
+            }
+        }
+
+        document.getElementById('btn-next-hand').addEventListener('click', () => {
+            initAudio();
+            document.getElementById('result-modal').style.display = 'none';
+            ui.dCards.innerHTML = ''; ui.pCards.innerHTML = ''; ui.cCards.innerHTML = '';
+            checkBankrupt();
+        });
+        ui.modeSelect.addEventListener('change', () => {
+            ui.dCards.innerHTML = ''; ui.pCards.innerHTML = ''; ui.cCards.innerHTML = '';
+            ui.btnDeal.style.display = 'inline-block';
+            ui.betControls.style.display = 'none';
+            ui.extraControls.style.display = 'none';
+            ui.instruction.innerText = "게임을 선택하고 DEAL을 누르세요.";
+        });
+
+        updateUI();
+    </script>
+</body>
+</html>
